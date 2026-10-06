@@ -1,0 +1,21 @@
+# Learning OS — Streamlit configuration
+#
+# These values are the baseline (first-paint) theme and match the LIGHT
+# design tokens. The live theme layer in app.py overrides component
+# colours for Dark / System modes, so every element follows the user's
+# choice after load.
+
+[theme]
+base = "light"
+primaryColor = "#285D3D"
+backgroundColor = "#F4F3EE"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#202722"
+linkColor = "#285D3D"
+font = "sans_serif"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false

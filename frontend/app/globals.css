@@ -1,0 +1,213 @@
+@import "tailwindcss";
+
+/* daisyUI supplies accessible component primitives; the visual identity comes
+   from the two custom themes below, which reuse the exact hex values already
+   validated in the Streamlit app (see lib/tokens.ts). */
+@plugin "daisyui" {
+  themes: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "forest-light";
+  default: true;
+  color-scheme: light;
+
+  --color-base-100: #ffffff;
+  --color-base-200: #f4f3ee;
+  --color-base-300: #e5e6df;
+  --color-base-content: #202722;
+  --color-primary: #285d3d;
+  --color-primary-content: #ffffff;
+  --color-secondary: #285d3d;
+  --color-secondary-content: #ffffff;
+  --color-accent: #285d3d;
+  --color-accent-content: #ffffff;
+  --color-neutral: #242b26;
+  --color-neutral-content: #f0f1ea;
+  --color-info: #285d3d;
+  --color-info-content: #ffffff;
+  --color-success: #1b6e40;
+  --color-success-content: #ffffff;
+  --color-warning: #7a5b12;
+  --color-warning-content: #ffffff;
+  --color-error: #a93226;
+  --color-error-content: #ffffff;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "forest-dark";
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #242b26;
+  --color-base-200: #191e1b;
+  --color-base-300: #3c453e;
+  --color-base-content: #f0f1ea;
+  --color-primary: #9cc5a4;
+  --color-primary-content: #191e1b;
+  --color-secondary: #9cc5a4;
+  --color-secondary-content: #191e1b;
+  --color-accent: #9cc5a4;
+  --color-accent-content: #191e1b;
+  --color-neutral: #191e1b;
+  --color-neutral-content: #f0f1ea;
+  --color-info: #9cc5a4;
+  --color-info-content: #191e1b;
+  --color-success: #8cc7a2;
+  --color-success-content: #191e1b;
+  --color-warning: #d9bc76;
+  --color-warning-content: #191e1b;
+  --color-error: #e8a199;
+  --color-error-content: #191e1b;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* Semantic layer. Components use these names (bg-surface, text-muted,
+   border-line) instead of raw palette values, so both themes are handled in
+   one place and no component needs dark: variants. */
+:root {
+  --canvas: #f4f3ee;
+  --surface: #ffffff;
+  --ink: #202722;
+  --muted: #657067;
+  --line: #e5e6df;
+  --accent: #285d3d;
+  --on-accent: #ffffff;
+  --success: #1b6e40;
+  --warning: #7a5b12;
+  --error: #a93226;
+
+  --raised: color-mix(in srgb, var(--ink) 3%, var(--surface));
+  --accent-soft: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  --code-bg: color-mix(in srgb, var(--ink) 5%, var(--surface));
+  --hairline: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+[data-theme="forest-dark"] {
+  --canvas: #191e1b;
+  --surface: #242b26;
+  --ink: #f0f1ea;
+  --muted: #a8b2a9;
+  --line: #3c453e;
+  --accent: #9cc5a4;
+  --on-accent: #191e1b;
+  --success: #8cc7a2;
+  --warning: #d9bc76;
+  --error: #e8a199;
+}
+
+/* First paint before hydration: follow the device when nothing is set. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --canvas: #191e1b;
+    --surface: #242b26;
+    --ink: #f0f1ea;
+    --muted: #a8b2a9;
+    --line: #3c453e;
+    --accent: #9cc5a4;
+    --on-accent: #191e1b;
+    --success: #8cc7a2;
+    --warning: #d9bc76;
+    --error: #e8a199;
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-code: var(--code-bg);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-hairline: var(--hairline);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono-jetbrains), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-card: 0.75rem;
+  --radius-ctl: 0.5rem;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Small uppercase label that introduces a group without a heavy border. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .hairline {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 0;
+  }
+}
