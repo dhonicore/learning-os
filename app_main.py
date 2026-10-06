@@ -19,7 +19,6 @@ loudly instead of silently serving stale or duplicated values.
 from __future__ import annotations
 
 import ast
-import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -31,8 +30,6 @@ from pydantic import BaseModel, Field
 from questions import QUESTIONS
 
 load_dotenv()
-
-logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parent
 APP_PY = REPO_ROOT / "app.py"
@@ -321,17 +318,6 @@ def tutor_turn(body: TutorTurnRequest) -> TutorTurnOut:
             gave_up=body.gave_up,
         )
     except Exception as exc:
-        # Temporary diagnostic (Render Shell unavailable on current plan):
-        # expose the failing exception's type/message/SQLSTATE in Render
-        # logs. Deliberately excludes DATABASE_URL, passwords, API keys,
-        # learner/reference SQL, history, and auth material.
-        logger.error(
-            "tutor_turn failed: type=%s.%s message=%s sqlstate=%s",
-            type(exc).__module__,
-            type(exc).__name__,
-            exc,
-            getattr(exc, "sqlstate", None),
-        )
         status_code, message = _classify_turn_error(exc)
         raise HTTPException(status_code=status_code, detail=message) from exc
 
