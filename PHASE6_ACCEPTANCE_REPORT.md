@@ -179,7 +179,7 @@ historical stage_a–e suites:  green per 2026-10-05 report (scripts not on disk
 - **Build command:** `npm run build` ✅
 - **Output:** `.next/` with 3 dynamic routes + static assets ✅
 - **vercel.json:** Added with SPA rewrites + API proxy to Render ✅
-- **Env vars needed:** `NEXT_PUBLIC_API_ORIGIN=https://nobunk-v2.onrender.com`
+- **Env vars needed:** `NEXT_PUBLIC_API_ORIGIN=https://learning-os-c4h7.onrender.com`
 
 ### Render (FastAPI)
 - **Start command:** `uvicorn app_main:app --host 0.0.0.0 --port $PORT` ✅
@@ -210,7 +210,7 @@ NEXT_PUBLIC_API_ORIGIN=
 5. **API-failure E2E** — 1 skipped (pre-existing intentional skip for backend-down scenario; not a failure, untouched).
 
 ### Deployment Configuration Verification (2026-10-06)
-- `frontend/vercel.json` ✅ rewrites `/api/:path*` → `https://nobunk-v2.onrender.com/api/:path*` + security headers (nosniff, DENY, XSS block)
+- `frontend/vercel.json` ✅ rewrites `/api/:path*` → `https://learning-os-c4h7.onrender.com/api/:path*` + security headers (nosniff, DENY, XSS block)
 - `.env.example` ✅ documents `DATABASE_URL`, `GROQ_API_KEY`, `NEXT_PUBLIC_API_ORIGIN` (no secrets; matches `.gitignore`d `.env` names)
 - `frontend/next.config.ts` ✅ dev/prod proxy `/api/:path*` → `${NEXT_PUBLIC_API_ORIGIN}/api/:path*` (default `http://127.0.0.1:8000`)
 - `NEXT_PUBLIC_API_ORIGIN` ✅ documented in `.env.example`, `MIGRATION_PLAN.md`, and this report
