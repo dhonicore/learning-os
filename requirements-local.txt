@@ -1,0 +1,14 @@
+# Learning OS — local development dependencies (Streamlit fallback + tests).
+#
+# Includes production requirements above, plus everything needed to run the
+# Streamlit fallback (app.py) and the verification suites locally.
+# Render ignores this file (it builds from requirements.txt only).
+#
+# Versions pinned to the verified local .venv on 2026-10-06.
+
+-r requirements.txt
+
+streamlit==1.63.0          # app.py: Streamlit fallback UI (must stay runnable)
+pandas==3.0.6              # streamlit data stack (matches local venv)
+pyarrow==25.0.1            # streamlit data stack (matches local venv)
+pytest==9.1.1              # tests/test_api.py, tests/test_parity.py
