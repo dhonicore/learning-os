@@ -176,8 +176,12 @@ def test_reference_receives_statement_timeout(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_learner_failure_rolls_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    # B1-3: the injected failure is a real psycopg error (database rejected
+    # the SQL); a generic Exception now means "bug" and propagates instead.
     result, db = run(
-        monkeypatch, learner_exc=Exception("learner pg error"), ref_rows=[(1,)]
+        monkeypatch,
+        learner_exc=pg_errors.SyntaxError("learner pg error"),
+        ref_rows=[(1,)],
     )
     assert result["reason"] == "sql_error"
     assert result["correct"] is False
@@ -190,7 +194,9 @@ def test_learner_failure_does_not_run_reference(
     """Learner failure early-returns `sql_error`: no wasted reference round
     trip, and no reference data can leak into a learner-error result."""
     result, db = run(
-        monkeypatch, learner_exc=Exception("learner pg error"), ref_rows=[(1,)]
+        monkeypatch,
+        learner_exc=pg_errors.SyntaxError("learner pg error"),
+        ref_rows=[(1,)],
     )
     assert result["reason"] == "sql_error"
     assert result["correct"] is False
@@ -218,7 +224,7 @@ def test_guard_renewed_after_prior_rollback(
 
 
 def test_reference_failure_rolls_back(monkeypatch: pytest.MonkeyPatch) -> None:
-    result, db = run(monkeypatch, ref_exc=Exception("reference pg error"))
+    result, db = run(monkeypatch, ref_exc=pg_errors.SyntaxError("reference pg error"))
     assert result["correct"] is False
     assert result["reason"] == "reference_error"
     assert db.connections[1].rollbacks >= 1
@@ -243,14 +249,16 @@ def test_success_rolls_back_and_closes(monkeypatch: pytest.MonkeyPatch) -> None:
 # --------------------------------------------------------------------------
 
 
-def test_timeout_error_becomes_sql_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_timeout_error_becomes_timeout_reason(monkeypatch: pytest.MonkeyPatch) -> None:
+    # B1-3: a learner statement timeout is its own stable reason, no longer
+    # an ambiguous sql_error.
     timeout = pg_errors.QueryCanceled(
         "canceling statement due to statement timeout"
     )
     assert timeout.sqlstate == "57014"
     result, db = run(monkeypatch, learner_exc=timeout)
     assert result["correct"] is False
-    assert result["reason"] == "sql_error"
+    assert result["reason"] == "timeout"
     assert result["row_diff"] == (0, 0)
     assert result["learner_rows"] == []
     assert db.connections[0].rollbacks >= 1

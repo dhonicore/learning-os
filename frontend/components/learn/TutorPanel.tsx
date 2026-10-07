@@ -27,21 +27,9 @@ export interface TutorPanelProps {
   earlierAttempts: Array<{ attempt: number; correct: boolean; reason?: string; hintLevel?: number; gaveUp: boolean }>;
 }
 
-/** Reason label presentation (from app.py _REASON_LABELS). */
-function reasonLabel(reason: string | undefined): string {
-  const map: Record<string, string> = {
-    ok: "correct",
-    value_mismatch: "value mismatch",
-    missing_rows: "missing rows",
-    extra_rows: "extra rows",
-    shape_mismatch: "shape mismatch",
-    sql_error: "SQL error",
-    unsafe: "unsafe",
-    unknown_question: "unknown question",
-    reference_error: "reference error",
-  };
-  return reason ? (map[reason] || reason) : "";
-}
+/** Reason labels come from the backend (`toolResult.reason_label`, sourced
+ *  from app.py `_REASON_LABELS`). No local map: duplicating it let raw reason
+ *  codes reach learners whenever a new reason shipped without a label here. */
 
 /** Format attempt·hint meta line. */
 function turnMeta(attempt: number, hintLevel: number | null, gaveUp: boolean): string {
@@ -54,7 +42,7 @@ function turnMeta(attempt: number, hintLevel: number | null, gaveUp: boolean): s
 function hintContextDescription(level: number | null, toolResult: ToolResult | null): React.ReactNode {
   if (level === null || toolResult === null) return null;
 
-  const reasonText = reasonLabel(toolResult.reason);
+  const reasonText = toolResult.reason_label;
 
   switch (level) {
     case 0:
@@ -142,7 +130,7 @@ export function TutorPanel({
   gaveUp,
   earlierAttempts
 }: TutorPanelProps) {
-  const reasonText = reasonLabel(toolResult?.reason);
+  const reasonText = toolResult?.reason_label ?? "";
 
   // Status banner: "correct" or "incorrect" with reason
   const statusClass = toolResult?.correct
@@ -210,7 +198,7 @@ export function TutorPanel({
                   <div>
                     Attempt {a.attempt}: {a.correct ? "correct" : "incorrect"}
                   </div>
-                  {a.reason && <div>{reasonLabel(a.reason)}</div>}
+                  {a.reason && <div>{a.reason}</div>}
                   {a.hintLevel !== undefined && (
                     <div>hint level {a.hintLevel} of 4</div>
                   )}

@@ -1589,3 +1589,48 @@ streamlit run app.py --server.headless true --server.port 8511
 9. **`build_log.md` is preserved** — do not overwrite it.
 10. **Architecture stays as agreed** (handoff §9): Streamlit → tutor → Groq →
     tool → checker → Supabase → filtered feedback → Groq → response.
+
+---
+
+## B1-3 — Safe error / reason contract: COMPLETE (2026-10-07)
+
+**Scope:** Establish the boundary between internal technical failures and
+learner-facing responses (follows B1-1 execution boundary + B1-2 input/result
+bounds, commit f1944bf). Audit/design approved before implementation.
+
+**Contract (checker.py):** every SQL-execution failure is classified in a
+load-bearing order — SQLSTATE `57014` first (`QueryCanceled` subclasses
+`psycopg.OperationalError`), then `OperationalError` re-raised
+(infrastructure is never a grading outcome), then remaining `psycopg.Error`
+converted. Non-psycopg exceptions propagate as unexpected internal failures.
+
+**Changes:**
+- `checker.py` — new `QUERY_TIMEOUT_SQLSTATE = "57014"`; learner statement
+  timeout now emits reason `timeout` (was ambiguous `sql_error`); reference
+  timeout stays `reference_error`; connection/transport failures (incl.
+  `AdminShutdown` 57P01) propagate to the API's 503/500 mapping instead of
+  becoming 200 + `sql_error`/`reference_error`; `result["error"]` carries
+  static backend-owned strings only — raw DB exception text removed from the
+  checker result contract; error-path rollback guarded so a dead connection
+  cannot mask the original failure. Successful-path result contract unchanged.
+- `app.py` — `_REASON_LABELS` only: added `timeout` ("your query took too
+  long and was stopped"), added `too_many_rows` ("your query returned too
+  many rows" — previously rendered raw to learners), corrected `unsafe` to
+  "only a single read-only SELECT query within the size limit is allowed"
+  (the 10 KB rejection no longer shows a false read-only-only message).
+- `frontend/components/learn/TutorPanel.tsx` — reason-label consumption only:
+  deleted the duplicated local label map; banner and hint context now use the
+  API-provided `toolResult.reason_label` (single source of truth).
+- `tests/test_checker_errors.py` — new mocked contract suite (timeout,
+  sql_error sanitisation, OperationalError/AdminShutdown propagation,
+  reference-side mapping, reason↔label invariant, oversize gate,
+  non-psycopg propagation).
+- `tests/test_api.py` — expected label dict updated in lockstep.
+- `tests/test_checker_boundary.py` — four tests re-pinned to the new contract
+  (real psycopg fixtures instead of generic `Exception`; timeout assertion
+  `sql_error` → `timeout`); all sequencing/rollback assertions unchanged.
+- `MIGRATION_PLAN.md` — checker reason list updated (also repairs the B1-2
+  `too_many_rows` doc drift).
+
+**Verified:** backend pytest 84/84 (73 baseline + 11 new); frontend Vitest,
+typecheck and lint clean. No commits, no deploys.

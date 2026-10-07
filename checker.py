@@ -4,6 +4,8 @@ from collections import Counter
 from datetime import date, datetime
 import re
 
+import psycopg
+
 from database import get_connection
 from questions import QUESTIONS
 
@@ -16,6 +18,22 @@ from questions import QUESTIONS
 # transaction. This value is a backend constant — never accept it from
 # the client.
 STATEMENT_TIMEOUT_SECONDS = 5
+
+# --- Error/reason contract (B1-3) --------------------------------------------
+# SQLSTATE raised when PostgreSQL cancels a statement — under our bounded
+# read-only transactions that means the statement_timeout fired. Detected by
+# SQLSTATE, never by parsing message text (driver wording is version-dependent).
+QUERY_TIMEOUT_SQLSTATE = "57014"
+
+# Learner/api-facing error strings are static and backend-owned: raw driver or
+# PostgreSQL text NEVER enters a result dict. Consumers of this module (the
+# API, the hint policy, the Streamlit app) must be able to trust that nothing
+# in a result can leak infrastructure detail.
+_ERROR_LEARNER_SQL = "The query could not be run."
+_ERROR_LEARNER_TIMEOUT = (
+    f"The query was stopped after the {STATEMENT_TIMEOUT_SECONDS}-second limit."
+)
+_ERROR_REFERENCE = "The reference query failed."
 
 
 # --- Input/result bounds (B1-2) ------------------------------------------------
@@ -117,6 +135,76 @@ def _run(conn, sql: str):
         return cur.fetchmany(MAX_ROWS + 1)
 
 
+def _rollback_quietly(conn) -> None:
+    """Rollback on an error path without masking the original failure.
+
+    The transaction is already doomed; a rollback that itself fails (e.g. on
+    a dead connection) must never replace the original exception or change
+    how it is classified.
+    """
+    try:
+        conn.rollback()
+    except Exception:
+        pass
+
+
+def _execution_error_result(exc: psycopg.Error, *, side: str) -> dict:
+    """Convert one database-rejected execution into a checker result.
+
+    Classification order is load-bearing:
+
+    A. SQLSTATE 57014 (statement cancelled — our timeout) comes FIRST,
+       because psycopg's QueryCanceled is a subclass of OperationalError.
+    B. psycopg.OperationalError (connection/transport/server-shutdown) is
+       re-raised: infrastructure failures are never grading outcomes. They
+       propagate to the API's dependency-failure mapping (503), unchanged.
+    C. Any remaining psycopg.Error means the database rejected the SQL
+       itself: a learner grading outcome (`sql_error`) or a reference
+       failure (`reference_error`).
+
+    Non-psycopg exceptions never reach here — they are not caught at the
+    call site and propagate as unexpected internal failures.
+    """
+    # A. Timeout (QueryCanceled subclasses OperationalError — check first).
+    if getattr(exc, "sqlstate", None) == QUERY_TIMEOUT_SQLSTATE:
+        if side == "learner":
+            return {
+                "correct": False,
+                "error": _ERROR_LEARNER_TIMEOUT,
+                "reason": "timeout",
+                "row_diff": (0, 0),
+                "learner_rows": [],
+            }
+        return {
+            "correct": False,
+            "error": _ERROR_REFERENCE,
+            "reason": "reference_error",
+            "row_diff": (0, 0),
+            "learner_rows": [],
+        }
+
+    # B. Infrastructure: never a grading outcome.
+    if isinstance(exc, psycopg.OperationalError):
+        raise exc
+
+    # C. The database rejected the SQL itself.
+    if side == "learner":
+        return {
+            "correct": False,
+            "error": _ERROR_LEARNER_SQL,
+            "reason": "sql_error",
+            "row_diff": (0, 0),
+            "learner_rows": [],
+        }
+    return {
+        "correct": False,
+        "error": _ERROR_REFERENCE,
+        "reason": "reference_error",
+        "row_diff": (0, 0),
+        "learner_rows": [],
+    }
+
+
 # --- Public API ---------------------------------------------------------
 
 def check_sql(question_id: int, learner_sql: str) -> dict:
@@ -163,22 +251,17 @@ def check_sql(question_id: int, learner_sql: str) -> dict:
     # 5. Execute learner SQL in its own isolated read-only transaction.
     # The reference query below starts a NEW transaction afterwards, so a
     # rollback here can never strip the safety boundary from it.
+    # Only psycopg.Error is converted into a grading outcome; anything else
+    # (bugs, misconfiguration) propagates as an unexpected internal failure.
     with get_connection() as conn:
 
         try:
             _start_read_only_transaction(conn)
             learner_rows = _run(conn, learner_sql)
 
-        except Exception as e:
-            conn.rollback()
-
-            return {
-                "correct": False,
-                "error": str(e),
-                "reason": "sql_error",
-                "row_diff": (0, 0),
-                "learner_rows": [],
-            }
+        except psycopg.Error as e:
+            _rollback_quietly(conn)
+            return _execution_error_result(e, side="learner")
 
         conn.rollback()
 
@@ -201,16 +284,9 @@ def check_sql(question_id: int, learner_sql: str) -> dict:
             _start_read_only_transaction(conn)
             ref_rows = _run(conn, ref_sql)
 
-        except Exception as e:
-            conn.rollback()
-
-            return {
-                "correct": False,
-                "error": f"Reference failed: {e}",
-                "reason": "reference_error",
-                "row_diff": (0, 0),
-                "learner_rows": [],
-            }
+        except psycopg.Error as e:
+            _rollback_quietly(conn)
+            return _execution_error_result(e, side="reference")
 
         conn.rollback()
 

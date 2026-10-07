@@ -65,7 +65,9 @@ _REASON_LABELS = {
     "extra_rows": "your output contains extra rows",
     "shape_mismatch": "your columns do not match the expected shape",
     "sql_error": "the query could not run",
-    "unsafe": "only read-only SELECT queries are allowed",
+    "timeout": "your query took too long and was stopped",
+    "too_many_rows": "your query returned too many rows",
+    "unsafe": "only a single read-only SELECT query within the size limit is allowed",
     "unknown_question": "unknown question",
     "reference_error": "the reference query failed",
 }

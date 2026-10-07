@@ -43,7 +43,7 @@ Browser ── (Streamlit websocket/RPC) ──> app.py (1372 lines, single scri
 | Backend turn | `app.py` `_run_turn()` | duplicate sig guard, lazy `tutor` import, commit-only-on-success, `_friendly_error()`, appends `activity_log` |
 | Progress | `app.py` `render_progress()` | derived purely from `activity_log`; session-only, no DB |
 | Settings | `app.py` `render_settings()` | theme rows + about (8 questions, 5 practice / 3 held out) |
-| Checker | `checker.py` `check_sql()` | read-only SQL guard, learner vs reference rows via `Counter` comparison, reasons: ok/value_mismatch/missing_rows/extra_rows/shape_mismatch/sql_error/unsafe/unknown_question/reference_error |
+| Checker | `checker.py` `check_sql()` | read-only SQL guard, learner vs reference rows via `Counter` comparison, reasons: ok/value_mismatch/missing_rows/extra_rows/shape_mismatch/sql_error/timeout/too_many_rows/unsafe/unknown_question/reference_error |
 | Hint policy | `hint_policy.py` `next_hint_level()`, `tool_context_for_level()` | levels 0–4; filters checker info the model may see; `MAX_ATTEMPTS = 4` |
 | Tutor LLM | `tutor.py` `run_tutor_turn()` | system prompt owns hint-level rules; **no model tool-calls** — Python invokes `execute_tool` itself |
 | DB | `database.py` `get_connection()` | psycopg → Supabase PostgreSQL, `.env` keys `DATABASE_URL`, `GROQ_API_KEY` |
