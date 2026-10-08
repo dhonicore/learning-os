@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Meta, ToolResult } from "@/types/api";
 
-import { PageHeader, Panel, SectionHead } from "@/components/ui/primitives";
+import { PageHeader, Panel, SectionHead, Eyebrow } from "@/components/ui/primitives";
 import { SqlEditor } from "@/components/learn/SqlEditor";
 import { ActionBar } from "@/components/learn/ActionBar";
 import { QuestionHeader } from "@/components/learn/QuestionHeader";
@@ -32,6 +32,18 @@ type ErrorState = {
   canRetry: boolean;
   retryAction?: () => void;
 } | null;
+
+// Slice B: the near-action outcome line reports the most recent *completed*
+// turn. While an error is shown the alert owns that moment, so a stale
+// outcome is suppressed until the error is dismissed or retried. No turn
+// logic changes — this only derives presentation state.
+function lastOutcomeOf(
+  tutorResult: ToolResult | null,
+  error: ErrorState,
+): "correct" | "incorrect" | null {
+  if (error !== null || tutorResult === null) return null;
+  return tutorResult.correct ? "correct" : "incorrect";
+}
 
 // ---------------------------------------------------------------------------
 // Learn workspace — functional SQL learning surface with Monaco editor.
@@ -206,15 +218,27 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
     );
   }
 
+  // Earlier attempts must contain *prior* turns only (TutorPanel's prop
+  // contract, TutorPanel.tsx:26). Every successful turn appends its activity
+  // entry in the same update that sets `tutorResult`, so the last entry for
+  // this question IS the turn on display — including it made TutorPanel's
+  // `earlierAttempts.length + (toolResult ? 1 : 0)` count that turn twice and
+  // render "Attempt 2" after the first submission (audit §1.3).
+  const qidEntries = activityLog.filter((e) => e.qid === selectedId);
+  const earlierAttemptEntries = tutorResult !== null ? qidEntries.slice(0, -1) : qidEntries;
+
   return (
     <div data-testid="learn-workspace">
-      <PageHeader
-        eyebrow="Learn"
-        title="Practice the questions"
-        description="One checker run and one tutor reply per submission. Your SQL is never modified by the tutor."
-      />
+      {/* Slice A: no page-title chrome — the question (QuestionHeader's h1)
+          is the primary object. This block is navigation context only. */}
+      <div className="flex flex-col gap-5 pb-8">
+        <div className="flex flex-col gap-2">
+          <Eyebrow>Learn</Eyebrow>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted">
+            One checker run and one tutor reply per submission. Your SQL is never modified by the tutor.
+          </p>
+        </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-start sm:gap-10">
         <QuestionHeader
           meta={meta}
           selectedId={selectedId}
@@ -222,10 +246,22 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
         />
       </div>
 
+      {/* Slice H1: one learning workspace. Two grid items (4 + 8) always
+          fill the 12-col row at lg, so the old 5/7/5 wrap that orphaned the
+          tutor beside an empty 7-col hole cannot occur. DOM order — schema,
+          then editor → action → feedback — is also the small-screen order. */}
       <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-12">
-        {/* Left column: editor + actions */}
-        <Panel className="flex flex-col gap-4 p-5 sm:p-6 lg:col-span-7">
-          <p className="eyebrow">SQL editor</p>
+        {/* Reference column: SchemaPanel brings its own bordered surface,
+            so no wrapper card (the old Panel here duplicated its border and
+            its "Database schema" label). */}
+        <div className="lg:col-span-4">
+          <SchemaPanel />
+        </div>
+
+        {/* SQL workspace: editor → action → verdict → tutor in one column
+            so feedback reads as the result of the Submit above it. */}
+        <Panel className="flex flex-col gap-4 p-5 sm:p-6 lg:col-span-8">
+          <p className="eyebrow">SQL workspace</p>
 
           <SqlEditor
             value={currentDraft}
@@ -250,30 +286,22 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
             onGiveUp={handleGiveUp}
             attemptsMap={attempts}
             duplicate={duplicate}
+            lastOutcome={lastOutcomeOf(tutorResult, error)}
           />
-        </Panel>
 
-        {/* Right column: schema + tutor */}
-        <Panel className="flex flex-col gap-3 p-5 sm:p-6 lg:col-span-5">
-          <p className="eyebrow">Database schema</p>
-          <SchemaPanel />
-        </Panel>
+          {/* Hairline: everything below responds to the action above. */}
+          <div className="h-px bg-line" aria-hidden="true" />
 
-        <Panel className="flex flex-col gap-3 p-5 sm:p-6 lg:col-span-5">
           <TutorPanel
             toolResult={tutorResult}
             reply={reply}
             hintLevel={hintLevel}
-            gaveUp={gaveUp}
-            earlierAttempts={activityLog
-              .filter((e) => e.qid === selectedId)
-              .map((e) => ({
-                attempt: e.attempt,
-                correct: e.correct,
-                reason: e.gave_up ? "gave up" : undefined,
-                hintLevel: e.hint_level ?? undefined,
-                gaveUp: e.gave_up,
-              }))}
+            earlierAttempts={earlierAttemptEntries.map((e) => ({
+              attempt: e.attempt,
+              correct: e.correct,
+              hintLevel: e.hint_level ?? undefined,
+              gaveUp: e.gave_up,
+            }))}
           />
         </Panel>
       </div>

@@ -2,15 +2,20 @@
 
 import { useMemo } from "react";
 import { cn } from "@/lib/cn";
-import { Eyebrow, SectionHead } from "@/components/ui/primitives";
+import { Eyebrow } from "@/components/ui/primitives";
 import type { QuestionMeta } from "@/types/api";
 
-/** Question header + metadata display.
+/** Question-first header (audit Slice A).
  *
- * Mirrors Streamlit's `_render_question_nav` + question header:
- * - Practice / Held out pill groups for navigation.
- * - Question number + purpose label.
- * - Question title (truncated if needed).
+ * The question is the primary learning object, so it owns the top of the
+ * page outright: a quiet identity line, then the question text itself as
+ * the page's top-level heading, then navigation as a secondary group.
+ * There is no page-title chrome and no wrapping card — the question carries
+ * the visual weight through type alone.
+ *
+ * Mirrors Streamlit's `_render_question_nav` navigation:
+ * - Practice / Held out pill groups for navigation (unchanged behaviour).
+ * - Question number + purpose label as supporting metadata.
  */
 export interface QuestionHeaderProps {
   /** Metadata from E2. */
@@ -38,11 +43,19 @@ export function QuestionHeader({
   }, [questions, selectedId]);
 
   return (
-    <>
-      <Eyebrow>Learn</Eyebrow>
-      <SectionHead>Question {selected?.id ?? "—"} of {questions.length ?? "—"} · {purposeTag(selected?.purpose)}</SectionHead>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Eyebrow>
+          Question {selected?.id ?? "—"} of {questions.length ?? "—"} · {purposeTag(selected?.purpose)}
+        </Eyebrow>
+        {selected?.question ? (
+          <h1 data-testid="question-text" className="max-w-3xl text-[1.75rem] font-semibold leading-tight text-ink sm:text-[2rem]">
+            {selected.question}
+          </h1>
+        ) : null}
+      </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 mt-2">
+      <nav aria-label="Questions" className="flex flex-col sm:flex-row gap-2">
         <PracticePills
           label="Practice"
           ids={meta?.practice_ids ?? []}
@@ -55,8 +68,8 @@ export function QuestionHeader({
           selectedId={selected?.id ?? null}
           onSelect={onSelect}
         />
-      </div>
-    </>
+      </nav>
+    </div>
   );
 }
 

@@ -14,7 +14,7 @@ export interface ErrorAlertProps {
 
 export function ErrorAlert({ message, onDismiss, onRetry }: ErrorAlertProps) {
   return (
-    <div className={cn("rounded-ctl border border-error bg-error/10 p-3 text-sm text-error")}>
+    <div role="alert" className={cn("rounded-ctl border border-error bg-error/10 p-3 text-sm text-error")}>
       <div className="flex items-start gap-2">
         <svg className="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10" />

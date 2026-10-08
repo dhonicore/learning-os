@@ -16,7 +16,10 @@ export interface SqlEditorProps {
 
 export function SqlEditor({ value, onChange, disabled = false, onMount }: SqlEditorProps) {
   const theme = useTheme();
-  const monacoTheme = theme.mode === "dark" ? "vs-dark" : "light";
+  // Slice C: `mode` is the user's preference setting (system/light/dark);
+  // `resolved` is the theme actually painted. Keying Monaco off `mode` left
+  // the editor white whenever the device was dark and the mode was System.
+  const monacoTheme = theme.resolved === "dark" ? "vs-dark" : "light";
   const [mounted, setMounted] = useState(false);
 
   const handleEditorDidMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
