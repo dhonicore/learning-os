@@ -79,7 +79,7 @@ export function SqlEditor({ value, onChange, disabled = false, onMount }: SqlEdi
             SQL
           </span>
         </div>
-        <div className="h-[220px] sm:h-[260px] lg:h-[280px]">
+        <div className="h-[260px] sm:h-[320px] lg:h-[360px]">
           <MonacoEditor
             value={value}
             onChange={(val, editor) => {

@@ -214,57 +214,67 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
         onSelect={handleQuestionSelect}
       />
 
-      {/* Workspace: reference + query as one coherent surface */}
-      <section aria-label="Workspace" className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
-        <div className="lg:col-span-4">
-          <SchemaPanel open={true} />
-        </div>
+      <div className="flex flex-col gap-4">
+        {/* Reference informs the query being written beside it. */}
+        <section
+          aria-label="Workspace"
+          className="grid grid-cols-1 border-y border-line lg:grid-cols-12"
+        >
+          <div className="border-b border-line py-5 lg:col-span-4 lg:border-b-0 lg:border-r lg:py-7 lg:pr-8">
+            <SchemaPanel open={true} />
+          </div>
 
-        <div className="flex flex-col gap-4 lg:col-span-8">
-          <SqlEditor
-            value={currentDraft}
-            onChange={(sql) => handleDraftChange(selectedId ?? 0, sql)}
-            disabled={pending}
-          />
-
-          {error && (
-            <ErrorAlert
-              message={error.message}
-              onDismiss={() => setError(null)}
-              onRetry={error.retryAction}
+          <div className="min-w-0 py-5 lg:col-span-8 lg:py-7 lg:pl-8">
+            <SqlEditor
+              value={currentDraft}
+              onChange={(sql) => handleDraftChange(selectedId ?? 0, sql)}
+              disabled={pending}
             />
-          )}
+          </div>
+        </section>
 
-          <ActionBar
-            qid={selectedId ?? 0}
-            sql={currentDraft}
-            pending={pending}
-            gaveUp={gaveUp}
-            onSubmit={handleSubmit}
-            onGiveUp={handleGiveUp}
-            attemptsMap={attempts}
-            duplicate={duplicate}
-            lastOutcome={lastOutcomeOf(tutorResult, error)}
-          />
+        {/* Check and feedback continue below the spatial workspace. */}
+        <div className="grid grid-cols-1 lg:grid-cols-12">
+          <div className="flex min-w-0 flex-col gap-4 lg:col-start-5 lg:col-span-8 lg:pl-8">
+            <ActionBar
+              qid={selectedId ?? 0}
+              sql={currentDraft}
+              pending={pending}
+              gaveUp={gaveUp}
+              onSubmit={handleSubmit}
+              onGiveUp={handleGiveUp}
+              attemptsMap={attempts}
+              duplicate={duplicate}
+              lastOutcome={lastOutcomeOf(tutorResult, error)}
+            />
 
-          <TutorPanel
-            toolResult={tutorResult}
-            reply={reply}
-            hintLevel={hintLevel}
-            earlierAttempts={earlierAttemptEntries.map((e) => ({
-              attempt: e.attempt,
-              correct: e.correct,
-              hintLevel: e.hint_level ?? undefined,
-              gaveUp: e.gave_up,
-            }))}
-            onNextQuestion={handleNextQuestion}
-            hasNextQuestion={
-              metaData.questions.findIndex((q) => q.id === selectedId) <
-              metaData.questions.length - 1
-            }
-          />
+            {error && (
+              <ErrorAlert
+                message={error.message}
+                onDismiss={() => setError(null)}
+                onRetry={error.retryAction}
+              />
+            )}
+
+            <TutorPanel
+              toolResult={tutorResult}
+              reply={reply}
+              hintLevel={hintLevel}
+              earlierAttempts={earlierAttemptEntries.map((e) => ({
+                attempt: e.attempt,
+                correct: e.correct,
+                hintLevel: e.hint_level ?? undefined,
+                gaveUp: e.gave_up,
+              }))}
+              onNextQuestion={handleNextQuestion}
+              hasNextQuestion={
+                metaData.questions.findIndex((q) => q.id === selectedId) <
+                metaData.questions.length - 1
+              }
+            />
+          </div>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

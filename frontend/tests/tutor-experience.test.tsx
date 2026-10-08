@@ -306,7 +306,7 @@ describe("Tutor experience (learner-facing)", () => {
 
     const status = screen.getByTestId("tutor-status");
     expect(status).toHaveTextContent(/^Correct/);
-    expect(status).toHaveTextContent("the result matches the expected answer");
+    expect(status).not.toHaveTextContent("the result matches the expected answer");
     expect(screen.getByTestId("tutor-reply")).toHaveTextContent(
       "Exactly right — you filtered on city.",
     );

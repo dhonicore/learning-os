@@ -325,7 +325,7 @@ test.describe('Responsive layouts', () => {
 });
 
 test.describe('Workspace composition', () => {
-  test('schema is the left reference column; feedback sits below the action in the SQL column', async ({ page }) => {
+  test('workspace is content-height; action and feedback continue below it in the SQL column', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
     await expect(page.locator('main').getByTestId('qnav-Q1')).toBeVisible({ timeout: 30000 });
@@ -333,9 +333,11 @@ test.describe('Workspace composition', () => {
     await expect(page.locator('main').getByTestId('tutor-panel')).toHaveCount(0);
 
     const main = page.locator('main');
+    const workspace = await main.getByRole('region', { name: 'Workspace' }).boundingBox();
     const schema = await main.getByTestId('schema-panel').boundingBox();
     const editor = await main.getByTestId('sql-editor').boundingBox();
     const submit = await main.getByTestId('submit-sql').boundingBox();
+    expect(workspace).toBeTruthy();
     expect(schema).toBeTruthy();
     expect(editor).toBeTruthy();
     expect(submit).toBeTruthy();
@@ -343,8 +345,11 @@ test.describe('Workspace composition', () => {
     // Schema is the supporting left column; the SQL column starts to its right.
     expect(schema!.x + schema!.width).toBeLessThanOrEqual(editor!.x);
 
-    // Feedback appears only after a submission, inside the SQL column and
-    // directly below the action row — not wrapped under the schema.
+    // The action starts naturally after the workspace, in the query column.
+    expect(submit!.y).toBeGreaterThanOrEqual(workspace!.y + workspace!.height);
+
+    // Feedback appears only after a submission and remains aligned to the
+    // SQL column, below the action.
     await page.locator('main').getByTestId('qnav-Q1').click();
     await typeSql(page, 'SELECT 13;');
     await page.locator('main').getByTestId('submit-sql').click();
@@ -353,17 +358,17 @@ test.describe('Workspace composition', () => {
     expect(tutor).toBeTruthy();
     expect(tutor!.x).toBeGreaterThanOrEqual(editor!.x);
     expect(tutor!.y).toBeGreaterThanOrEqual(submit!.y + submit!.height);
-    // Same left edge as the action row: both live in one panel.
+    // Same left edge as the action row: both align to the query column.
     expect(Math.abs(tutor!.x - submit!.x)).toBeLessThanOrEqual(1);
 
-    // Structural invariant: action and feedback share a single panel section
-    // (the old 5/7/5 grid put the tutor in its own panel below the schema).
-    const sharedPanel = await page.evaluate(() => {
-      const action = document.querySelector('main [data-testid="submit-sql"]')?.closest('section');
-      const feedback = document.querySelector('main [data-testid="tutor-panel"]')?.closest('section');
-      return !!action && action === feedback;
+    // The Reference + Query divider ends with the workspace, before action and feedback.
+    const outsideWorkspace = await page.evaluate(() => {
+      const workspace = document.querySelector('main section[aria-label="Workspace"]');
+      const action = document.querySelector('main [data-testid="submit-sql"]');
+      const feedback = document.querySelector('main [data-testid="tutor-panel"]');
+      return !!workspace && !!action && !!feedback && !workspace.contains(action) && !workspace.contains(feedback);
     });
-    expect(sharedPanel).toBe(true);
+    expect(outsideWorkspace).toBe(true);
   });
 });
 

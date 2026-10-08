@@ -25,8 +25,8 @@ function renderTables(tables: Array<Array<string | string[]>>): React.ReactNode 
             <div className="text-sm font-medium text-ink">{tableName}</div>
             <div className="mt-1.5 flex flex-col gap-0.5">
               {columns.map((col, j) => (
-                <div key={j} className="flex gap-3 text-xs">
-                  <span className="min-w-[5rem] text-ink">{col[0]}</span>
+                <div key={j} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 text-xs">
+                  <span className="text-ink">{col[0]}</span>
                   <span className="text-muted">{col[1]}</span>
                 </div>
               ))}

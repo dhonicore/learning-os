@@ -126,31 +126,59 @@ export function TutorPanel({
   const phrase = gaveUpTurn ? null : guidancePhrase(toolResult.correct, hintLevel);
 
   return (
-    <div
-      className="flex flex-col gap-4 animate-feedback"
-      data-testid="tutor-panel"
-    >
+    <div className="animate-feedback" data-testid="tutor-panel">
       {gaveUpTurn && (
         <div
-          className="rounded-ctl border border-muted bg-raised p-4"
+          className="rounded-card border border-line bg-raised p-5 sm:p-6"
           data-testid="tutor-gave-up"
         >
           <div className="flex items-start gap-3">
-            <AlertIcon className="mt-0.5 size-5 shrink-0 text-muted" />
-            <div className="flex flex-col gap-1">
-              <h2 className="text-base font-semibold text-ink">Reference solution revealed</h2>
+            <AlertIcon className="mt-1 size-5 shrink-0 text-muted" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-semibold text-ink">Reference solution revealed</h2>
               <p className="text-sm text-muted">
                 You chose Give up, so the reference SQL and walkthrough appear below.
               </p>
+              <p className="mt-2 text-xs text-muted" data-testid="turn-meta">
+                Attempt {attemptNumber}
+              </p>
             </div>
           </div>
+
+          {reply !== null && reply !== "" && (
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="eyebrow mb-2">Reference solution</h3>
+              <div
+                className="flex flex-col gap-1 break-words text-sm leading-relaxed text-ink"
+                data-testid="tutor-reply"
+              >
+                {renderMarkdown(reply)}
+              </div>
+            </div>
+          )}
+
+          {earlierAttempts.length > 0 && (
+            <details className="mt-4 border-t border-line pt-3">
+              <summary
+                className="cursor-pointer text-sm font-medium text-ink hover:text-accent"
+                data-testid="earlier-attempts"
+              >
+                Earlier attempts ({earlierAttempts.length})
+              </summary>
+              <ul className="mt-2 flex flex-col gap-1.5 text-xs text-muted">
+                {earlierAttempts.map((a) => (
+                  <li key={a.attempt}>{attemptRowLabel(a)}</li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
 
       {!gaveUpTurn && (
         <div
           className={cn(
-            "rounded-ctl border p-4",
+            "rounded-card border p-5 sm:p-6",
             toolResult.correct
               ? "border-success bg-success-surface"
               : "border-error bg-error-surface",
@@ -159,24 +187,26 @@ export function TutorPanel({
         >
           <div className="flex items-start gap-3">
             {toolResult.correct ? (
-              <CheckIcon className="mt-0.5 size-5 shrink-0 text-success" />
+              <CheckIcon className="mt-1 size-5 shrink-0 text-success" />
             ) : (
-              <AlertIcon className="mt-0.5 size-5 shrink-0 text-error" />
+              <AlertIcon className="mt-1 size-5 shrink-0 text-error" />
             )}
-            <div className="flex flex-1 flex-col gap-2">
-              <div className="flex flex-col gap-0.5">
+            <div className="min-w-0 flex-1">
+              <div>
                 <h2
                   className={cn(
-                    "text-base font-semibold",
+                    "text-lg font-semibold",
                     toolResult.correct ? "text-success" : "text-error",
                   )}
                 >
                   {toolResult.correct ? "Correct" : "Not quite"}
                 </h2>
-                {reasonText && <p className="text-sm text-ink">{reasonText}</p>}
+                {reasonText && !toolResult.correct && (
+                  <p className="text-sm text-ink">{reasonText}</p>
+                )}
               </div>
 
-              <p className="text-xs text-muted" data-testid="turn-meta">
+              <p className="mt-2 text-xs text-muted" data-testid="turn-meta">
                 Attempt {attemptNumber}
                 {phrase ? ` · ${phrase}` : ""}
               </p>
@@ -185,7 +215,7 @@ export function TutorPanel({
                 <button
                   type="button"
                   onClick={onNextQuestion}
-                  className="btn btn-primary mt-1 w-full rounded-ctl sm:w-auto"
+                  className="btn btn-primary mt-4 w-full rounded-ctl sm:w-auto"
                 >
                   Next question
                   <svg
@@ -200,39 +230,36 @@ export function TutorPanel({
                   </svg>
                 </button>
               )}
+
+              {reply !== null && reply !== "" && (
+                <div className="mt-4 border-t border-line/70 pt-4">
+                  <h3 className="eyebrow mb-2">{toolResult.correct ? "Tutor" : "Guidance"}</h3>
+                  <div
+                    className="flex flex-col gap-1 break-words text-sm leading-relaxed text-ink"
+                    data-testid="tutor-reply"
+                  >
+                    {renderMarkdown(reply)}
+                  </div>
+                </div>
+              )}
+
+              {earlierAttempts.length > 0 && (
+                <details className="mt-4 border-t border-line/70 pt-3">
+                  <summary
+                    className="cursor-pointer text-sm font-medium text-ink hover:text-accent"
+                    data-testid="earlier-attempts"
+                  >
+                    Earlier attempts ({earlierAttempts.length})
+                  </summary>
+                  <ul className="mt-2 flex flex-col gap-1.5 text-xs text-muted">
+                    {earlierAttempts.map((a) => (
+                      <li key={a.attempt}>{attemptRowLabel(a)}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           </div>
-        </div>
-      )}
-
-      {gaveUpTurn && (
-        <p className="text-xs text-muted" data-testid="turn-meta">
-          Attempt {attemptNumber}
-        </p>
-      )}
-
-      {reply !== null && reply !== "" && (
-        <div className="flex flex-col gap-2">
-          <h3 className="eyebrow">{gaveUpTurn ? "Reference solution" : "Guidance"}</h3>
-          <div
-            className="flex flex-col gap-1 break-words text-sm leading-relaxed text-ink"
-            data-testid="tutor-reply"
-          >
-            {renderMarkdown(reply)}
-          </div>
-        </div>
-      )}
-
-      {earlierAttempts.length > 0 && (
-        <div className="rounded-ctl border border-line bg-surface p-4">
-          <h3 className="eyebrow mb-2" data-testid="earlier-attempts">
-            Earlier attempts ({earlierAttempts.length})
-          </h3>
-          <ul className="flex flex-col gap-1.5 text-xs text-muted">
-            {earlierAttempts.map((a) => (
-              <li key={a.attempt}>{attemptRowLabel(a)}</li>
-            ))}
-          </ul>
         </div>
       )}
     </div>

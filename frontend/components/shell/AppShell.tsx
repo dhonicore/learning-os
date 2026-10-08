@@ -23,8 +23,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-20 border-b border-line bg-canvas/95 px-4 py-3 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-y-2">
+      <header className="sticky top-0 z-20 border-b border-line bg-canvas/95 py-3">
+        <div className="mx-auto flex w-full max-w-screen-2xl flex-wrap items-center justify-between gap-y-2 px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-4 sm:gap-6">
             <Link href="/" className="whitespace-nowrap leading-none">
               <span className="text-[1.0625rem] font-semibold tracking-tight">Learning OS</span>
@@ -58,7 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <main className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
         {children}
       </main>
     </div>
