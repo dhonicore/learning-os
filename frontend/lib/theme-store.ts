@@ -31,7 +31,7 @@ function prefersDark(): boolean {
 
 function paint(resolved: ThemeName): void {
   const root = document.documentElement;
-  root.dataset.theme = resolved === "dark" ? "forest-dark" : "forest-light";
+  root.dataset.theme = resolved === "dark" ? "learning-dark" : "learning-light";
   root.style.colorScheme = resolved;
 }
 

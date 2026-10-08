@@ -1,14 +1,13 @@
 /**
- * Design tokens — mirrored from the validated Streamlit palette.
+ * Design tokens — typed mirror of the CSS custom properties in
+ * `app/globals.css`.
  *
- * Source of truth: `app.py` (`LIGHT` / `DARK` dicts), which was verified in
- * Stage E/F: WCAG AA text contrast in both themes and accent focus rings at
- * 6.9:1 (light) / 8.8:1 (dark). `tests/tokens.test.ts` fails if these values
- * ever drift from `app.py`, so the two frontends cannot diverge.
+ * The CSS file is the source of truth for the visual identity. This module
+ * exports the same hex values so components that need raw colours (Monaco
+ * theme, canvas rendering) can import them without parsing CSS at runtime.
  *
- * The CSS custom properties in `app/globals.css` repeat these values; this
- * module is the typed copy used by components that need a raw hex (Monaco
- * theme, canvas rendering) and by the drift test.
+ * `tests/tokens.test.ts` verifies that these values stay in sync with the
+ * CSS source of truth and that every text/border pair meets WCAG AA.
  */
 
 export type ThemeName = "light" | "dark";
@@ -19,14 +18,22 @@ export type Palette = {
   canvas: string;
   /** Raised surfaces: cards, panels. */
   surface: string;
+  /** Slightly elevated surface. */
+  raised: string;
+  /** Code editor background. */
+  code: string;
   /** Primary text. */
   ink: string;
-  /** Secondary text: captions, labels. */
+  /** Secondary text: captions, labels. Meets WCAG AA on all surfaces. */
   muted: string;
   /** Hairline borders and dividers. */
   line: string;
-  /** Forest green: primary actions, active state, focus rings. */
+  /** Stronger borders for interactive control boundaries. */
+  lineStrong: string;
+  /** Primary interaction colour: actions, focus, active states. */
   accent: string;
+  /** Hover/pressed state for primary interactions. */
+  accentHover: string;
   /** Text/icon colour on top of `accent`. */
   onAccent: string;
   success: string;
@@ -35,12 +42,16 @@ export type Palette = {
 };
 
 export const LIGHT: Palette = {
-  canvas: "#F4F3EE",
+  canvas: "#F7F7F5",
   surface: "#FFFFFF",
-  ink: "#202722",
-  muted: "#657067",
-  line: "#E5E6DF",
-  accent: "#285D3D",
+  raised: "#FAFAF9",
+  code: "#F2F3F5",
+  ink: "#16181D",
+  muted: "#5F636D",
+  line: "#DCDDE1",
+  lineStrong: "#8F8F8F",
+  accent: "#315EF5",
+  accentHover: "#2448C7",
   onAccent: "#FFFFFF",
   success: "#1B6E40",
   error: "#A93226",
@@ -48,19 +59,77 @@ export const LIGHT: Palette = {
 };
 
 export const DARK: Palette = {
-  canvas: "#191E1B",
-  surface: "#242B26",
-  ink: "#F0F1EA",
-  muted: "#A8B2A9",
-  line: "#3C453E",
-  accent: "#9CC5A4",
-  onAccent: "#191E1B",
+  canvas: "#0D0F12",
+  surface: "#14171C",
+  raised: "#1A1E24",
+  code: "#101318",
+  ink: "#F2F4F7",
+  muted: "#A7ADB8",
+  line: "#292E36",
+  lineStrong: "#646464",
+  accent: "#6D8CFF",
+  accentHover: "#5475F5",
+  onAccent: "#0D0F12",
   success: "#8CC7A2",
   error: "#E8A199",
   warning: "#D9BC76",
 };
 
 export const PALETTES: Record<ThemeName, Palette> = { light: LIGHT, dark: DARK };
+
+// Augmented palette including generated colour-mix surfaces.
+type MixedPalette = Palette & {
+  accentSoft: string;
+  accentSubtle: string;
+};
+
+/** Returns the full palette including generated colour-mix surfaces. */
+export function fullPalette(theme: ThemeName): MixedPalette {
+  const base = PALETTES[theme];
+  return {
+    ...base,
+    accentSoft: mix(base.accent, base.surface, 0.1),
+    accentSubtle: mix(base.accent, base.surface, 0.06),
+  };
+}
+
+/** Monaco editor chrome colours derived from the current palette. */
+export function monacoColors(palette: MixedPalette): Record<string, string> {
+  return {
+    "editor.background": palette.code,
+    "editor.foreground": palette.ink,
+    "editorLineNumber.foreground": palette.muted,
+    "editorLineNumber.activeForeground": palette.ink,
+    "editorCursor.foreground": palette.accent,
+    "editor.selectionBackground": palette.accentSubtle,
+    "editor.inactiveSelectionBackground": palette.accentSubtle,
+    "editor.lineHighlightBackground": palette.raised,
+    "editorWidget.background": palette.surface,
+    "editorWidget.border": palette.line,
+    "input.background": palette.surface,
+    "input.border": palette.lineStrong,
+    "input.foreground": palette.ink,
+    "list.activeSelectionBackground": palette.accentSoft,
+    "list.hoverBackground": palette.raised,
+    "scrollbarSlider.background": palette.lineStrong,
+    "scrollbarSlider.hoverBackground": palette.muted,
+    "scrollbarSlider.activeBackground": palette.accent,
+  };
+}
+
+function mix(a: string, b: string, shareB: number): string {
+  const rgbA = hexToRgb(a);
+  const rgbB = hexToRgb(b);
+  return `#${[0, 1, 2]
+    .map((i) => Math.round(rgbA[i] * (1 - shareB) + rgbB[i] * shareB))
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
 
 export const THEME_MODES: readonly ThemeMode[] = ["system", "light", "dark"] as const;
 
@@ -72,7 +141,7 @@ export const THEME_MODE_LABELS: Record<ThemeMode, string> = {
 
 export const THEME_MODE_DESCRIPTIONS: Record<ThemeMode, string> = {
   system: "Follows your device's light or dark setting.",
-  light: "Warm off-white background with dark text.",
+  light: "Off-white background with dark text.",
   dark: "Deep charcoal background with light text.",
 };
 

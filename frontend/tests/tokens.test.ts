@@ -5,37 +5,50 @@ import { describe, expect, it } from "vitest";
 
 import { DARK, LIGHT, PALETTES, isThemeMode, isThemeName, resolveTheme } from "@/lib/tokens";
 
-const APP_PY = join(__dirname, "..", "..", "app.py");
-
-type PaletteKey = keyof typeof LIGHT;
-
-const PALETTE_MAP: Record<PaletteKey, string> = {
-  canvas: "bg",
-  surface: "surface",
-  ink: "text",
-  muted: "text-2",
-  line: "border",
-  accent: "accent",
-  onAccent: "on-accent",
-  success: "success",
-  error: "error",
-  warning: "warning",
-};
+const GLOBALS_CSS = join(__dirname, "..", "app", "globals.css");
 
 /**
- * The Streamlit app remains the source of truth for the palette. This reads
- * its LIGHT/DARK dicts straight from source and fails if the frontend tokens
- * drift, so the two frontends can never quietly diverge.
+ * The CSS file in `app/globals.css` is the single source of truth for the
+ * visual identity. This test reads the custom property values directly from
+ * that file and fails if `lib/tokens.ts` drifts, so components that need raw
+ * hex values (Monaco theme, canvas rendering) stay in sync with the CSS.
  */
-function readAppPalette(): Record<"LIGHT" | "DARK", Record<string, string>> {
-  const source = readFileSync(APP_PY, "utf8");
-  const readBlock = (name: "LIGHT" | "DARK") => {
-    const match = new RegExp(`${name} = \\{([\\s\\S]*?)\\n\\}`).exec(source);
-    if (!match) throw new Error(`${name} dict not found in app.py`);
-    const entries = [...match[1].matchAll(/"([a-z0-9-]+)":\s*"(#[0-9A-Fa-f]{6})"/g)];
-    return Object.fromEntries(entries.map((entry) => [entry[1], entry[2].toUpperCase()]));
-  };
-  return { LIGHT: readBlock("LIGHT"), DARK: readBlock("DARK") };
+
+const TOKEN_TO_CSS: Record<keyof typeof LIGHT, string> = {
+  canvas: "--canvas",
+  surface: "--surface",
+  raised: "--raised",
+  code: "--code",
+  ink: "--ink",
+  muted: "--muted",
+  line: "--line",
+  lineStrong: "--line-strong",
+  accent: "--accent",
+  accentHover: "--accent-hover",
+  onAccent: "--on-accent",
+  success: "--success",
+  warning: "--warning",
+  error: "--error",
+};
+
+function readCss(): string {
+  return readFileSync(GLOBALS_CSS, "utf8");
+}
+
+function extractBlock(css: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`${escaped}\\s*\\{([\\s\\S]*?)\\n\\}`).exec(css);
+  if (!match) throw new Error(`Could not find ${selector} block in globals.css`);
+  return match[1];
+}
+
+function parseVars(block: string): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const line of block.split("\n")) {
+    const match = /(--[a-z0-9\-]+):\s*(#[0-9A-Fa-f]{6})/.exec(line);
+    if (match) vars[match[1]] = match[2].toUpperCase();
+  }
+  return vars;
 }
 
 function relativeLuminance(hex: string): number {
@@ -55,34 +68,40 @@ function contrastRatio(foreground: string, background: string): number {
   return (light + 0.05) / (dark + 0.05);
 }
 
-describe("token parity with app.py", () => {
-  const appPalette = readAppPalette();
+describe("token parity with CSS source of truth", () => {
+  const css = readCss();
+  const lightVars = parseVars(extractBlock(css, ":root"));
+  const darkVars = parseVars(extractBlock(css, '[data-theme="learning-dark"]'));
 
-  for (const theme of ["LIGHT", "DARK"] as const) {
-    it(`${theme} palette matches the Streamlit source of truth`, () => {
-      const tokens = theme === "LIGHT" ? LIGHT : DARK;
-      for (const token of Object.keys(PALETTE_MAP) as PaletteKey[]) {
-        const appKey = PALETTE_MAP[token];
-        expect(tokens[token], `${theme}.${token} <- app.py ${theme}.${appKey}`).toBe(
-          appPalette[theme][appKey],
-        );
+  for (const [themeName, tokens, vars] of [
+    ["LIGHT", LIGHT, lightVars],
+    ["DARK", DARK, darkVars],
+  ] as const) {
+    it(`${themeName} palette matches app/globals.css`, () => {
+      for (const token of Object.keys(TOKEN_TO_CSS) as Array<keyof typeof LIGHT>) {
+        const cssVar = TOKEN_TO_CSS[token];
+        const cssValue = vars[cssVar];
+        expect(cssValue, `${themeName}.${token} is defined in CSS`).toBeDefined();
+        expect(tokens[token], `${themeName}.${token} matches ${cssVar}`).toBe(cssValue);
       }
     });
   }
 });
 
-describe("accessibility of the carried-over palette", () => {
-  it("primary text meets WCAG AA on canvas and surface in both themes", () => {
+describe("accessibility of the Learning OS palette", () => {
+  it("primary text meets WCAG AA on canvas, surface, and code in both themes", () => {
     for (const [name, palette] of Object.entries(PALETTES)) {
-      expect(contrastRatio(palette.ink, palette.canvas), `${name} ink/canvas`).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(palette.ink, palette.surface), `${name} ink/surface`).toBeGreaterThanOrEqual(4.5);
+      for (const bg of ["canvas", "surface", "code"] as const) {
+        expect(contrastRatio(palette.ink, palette[bg]), `${name} ink/${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
   });
 
-  it("secondary text meets WCAG AA on canvas and surface in both themes", () => {
+  it("secondary text meets WCAG AA on canvas, surface, and code in both themes", () => {
     for (const [name, palette] of Object.entries(PALETTES)) {
-      expect(contrastRatio(palette.muted, palette.canvas), `${name} muted/canvas`).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(palette.muted, palette.surface), `${name} muted/surface`).toBeGreaterThanOrEqual(4.5);
+      for (const bg of ["canvas", "surface", "code"] as const) {
+        expect(contrastRatio(palette.muted, palette[bg]), `${name} muted/${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
   });
 
@@ -98,6 +117,19 @@ describe("accessibility of the carried-over palette", () => {
       expect(contrastRatio(palette.success, palette.surface), `${name} success`).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(palette.error, palette.surface), `${name} error`).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(palette.warning, palette.surface), `${name} warning`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("control boundaries meet WCAG 1.4.11 non-text contrast on surface and canvas", () => {
+    for (const [name, palette] of Object.entries(PALETTES)) {
+      expect(contrastRatio(palette.lineStrong, palette.surface), `${name} line-strong/surface`).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(palette.lineStrong, palette.canvas), `${name} line-strong/canvas`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("focus ring meets WCAG non-text contrast on canvas", () => {
+    for (const [name, palette] of Object.entries(PALETTES)) {
+      expect(contrastRatio(palette.accent, palette.canvas), `${name} accent/canvas`).toBeGreaterThanOrEqual(3);
     }
   });
 });

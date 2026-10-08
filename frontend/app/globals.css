@@ -1,30 +1,30 @@
 @import "tailwindcss";
 
 /* daisyUI supplies accessible component primitives; the visual identity comes
-   from the two custom themes below, which reuse the exact hex values already
-   validated in the Streamlit app (see lib/tokens.ts). */
+   from the two custom themes below. These themes are now the frontend's own
+   cobalt/blue system and are no longer tied to the Streamlit fallback palette. */
 @plugin "daisyui" {
   themes: false;
 }
 
 @plugin "daisyui/theme" {
-  name: "forest-light";
+  name: "learning-light";
   default: true;
   color-scheme: light;
 
   --color-base-100: #ffffff;
-  --color-base-200: #f4f3ee;
-  --color-base-300: #e5e6df;
-  --color-base-content: #202722;
-  --color-primary: #285d3d;
+  --color-base-200: #fafaf9;
+  --color-base-300: #dcdde1;
+  --color-base-content: #16181d;
+  --color-primary: #315ef5;
   --color-primary-content: #ffffff;
-  --color-secondary: #285d3d;
+  --color-secondary: #315ef5;
   --color-secondary-content: #ffffff;
-  --color-accent: #285d3d;
+  --color-accent: #315ef5;
   --color-accent-content: #ffffff;
-  --color-neutral: #242b26;
-  --color-neutral-content: #f0f1ea;
-  --color-info: #285d3d;
+  --color-neutral: #16181d;
+  --color-neutral-content: #ffffff;
+  --color-info: #315ef5;
   --color-info-content: #ffffff;
   --color-success: #1b6e40;
   --color-success-content: #ffffff;
@@ -44,30 +44,30 @@
 }
 
 @plugin "daisyui/theme" {
-  name: "forest-dark";
+  name: "learning-dark";
   prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: #242b26;
-  --color-base-200: #191e1b;
-  --color-base-300: #3c453e;
-  --color-base-content: #f0f1ea;
-  --color-primary: #9cc5a4;
-  --color-primary-content: #191e1b;
-  --color-secondary: #9cc5a4;
-  --color-secondary-content: #191e1b;
-  --color-accent: #9cc5a4;
-  --color-accent-content: #191e1b;
-  --color-neutral: #191e1b;
-  --color-neutral-content: #f0f1ea;
-  --color-info: #9cc5a4;
-  --color-info-content: #191e1b;
+  --color-base-100: #14171c;
+  --color-base-200: #1a1e24;
+  --color-base-300: #292e36;
+  --color-base-content: #f2f4f7;
+  --color-primary: #6d8cff;
+  --color-primary-content: #0d0f12;
+  --color-secondary: #6d8cff;
+  --color-secondary-content: #0d0f12;
+  --color-accent: #6d8cff;
+  --color-accent-content: #0d0f12;
+  --color-neutral: #f2f4f7;
+  --color-neutral-content: #14171c;
+  --color-info: #6d8cff;
+  --color-info-content: #0d0f12;
   --color-success: #8cc7a2;
-  --color-success-content: #191e1b;
+  --color-success-content: #0d0f12;
   --color-warning: #d9bc76;
-  --color-warning-content: #191e1b;
+  --color-warning-content: #0d0f12;
   --color-error: #e8a199;
-  --color-error-content: #191e1b;
+  --color-error-content: #0d0f12;
 
   --radius-selector: 0.5rem;
   --radius-field: 0.5rem;
@@ -83,31 +83,42 @@
    border-line) instead of raw palette values, so both themes are handled in
    one place and no component needs dark: variants. */
 :root {
-  --canvas: #f4f3ee;
+  --canvas: #f7f7f5;
   --surface: #ffffff;
-  --ink: #202722;
-  --muted: #657067;
-  --line: #e5e6df;
-  --accent: #285d3d;
+  --raised: #fafaf9;
+  --code: #f2f3f5;
+  --ink: #16181d;
+  --muted: #5f636d;
+  --line: #dcdde1;
+  --line-strong: #8f8f8f;
+  --accent: #315ef5;
+  --accent-hover: #2448c7;
   --on-accent: #ffffff;
   --success: #1b6e40;
   --warning: #7a5b12;
   --error: #a93226;
 
-  --raised: color-mix(in srgb, var(--ink) 3%, var(--surface));
+  --success-surface: color-mix(in srgb, var(--success) 8%, var(--surface));
+  --error-surface: color-mix(in srgb, var(--error) 8%, var(--surface));
+  --warning-surface: color-mix(in srgb, var(--warning) 8%, var(--surface));
   --accent-soft: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  --code-bg: color-mix(in srgb, var(--ink) 5%, var(--surface));
+  --accent-subtle: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  --code-bg: var(--code);
   --hairline: color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
-[data-theme="forest-dark"] {
-  --canvas: #191e1b;
-  --surface: #242b26;
-  --ink: #f0f1ea;
-  --muted: #a8b2a9;
-  --line: #3c453e;
-  --accent: #9cc5a4;
-  --on-accent: #191e1b;
+[data-theme="learning-dark"] {
+  --canvas: #0d0f12;
+  --surface: #14171c;
+  --raised: #1a1e24;
+  --code: #101318;
+  --ink: #f2f4f7;
+  --muted: #a7adb8;
+  --line: #292e36;
+  --line-strong: #646464;
+  --accent: #6d8cff;
+  --accent-hover: #5475f5;
+  --on-accent: #0d0f12;
   --success: #8cc7a2;
   --warning: #d9bc76;
   --error: #e8a199;
@@ -116,13 +127,17 @@
 /* First paint before hydration: follow the device when nothing is set. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --canvas: #191e1b;
-    --surface: #242b26;
-    --ink: #f0f1ea;
-    --muted: #a8b2a9;
-    --line: #3c453e;
-    --accent: #9cc5a4;
-    --on-accent: #191e1b;
+    --canvas: #0d0f12;
+    --surface: #14171c;
+    --raised: #1a1e24;
+    --code: #101318;
+    --ink: #f2f4f7;
+    --muted: #a7adb8;
+    --line: #292e36;
+    --line-strong: #646464;
+    --accent: #6d8cff;
+    --accent-hover: #5475f5;
+    --on-accent: #0d0f12;
     --success: #8cc7a2;
     --warning: #d9bc76;
     --error: #e8a199;
@@ -133,16 +148,22 @@
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-raised: var(--raised);
+  --color-code: var(--code-bg);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-on-accent: var(--on-accent);
   --color-accent-soft: var(--accent-soft);
-  --color-code: var(--code-bg);
+  --color-accent-subtle: var(--accent-subtle);
   --color-success: var(--success);
-  --color-warning: var(--warning);
+  --color-success-surface: var(--success-surface);
   --color-error: var(--error);
+  --color-error-surface: var(--error-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
   --color-hairline: var(--hairline);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -196,12 +217,12 @@
 }
 
 @layer components {
-  /* Small uppercase label that introduces a group without a heavy border. */
+  /* Quiet label. Sentence case, no tracking, no uppercase shout. */
   .eyebrow {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--muted);
   }
 

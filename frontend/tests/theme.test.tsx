@@ -28,7 +28,7 @@ describe("ThemeControl", () => {
     renderThemeControl();
 
     await waitFor(() => {
-      expect(document.documentElement.dataset.theme).toBe("forest-light");
+      expect(document.documentElement.dataset.theme).toBe("learning-light");
     });
     expect(screen.getByRole("radio", { name: /System/ })).toHaveAttribute("aria-checked", "true");
   });
@@ -36,11 +36,11 @@ describe("ThemeControl", () => {
   it("writes the choice to the URL and applies the dark theme", async () => {
     const user = userEvent.setup();
     renderThemeControl();
-    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("forest-light"));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("learning-light"));
 
     await user.click(screen.getByRole("radio", { name: /Dark/ }));
 
-    expect(document.documentElement.dataset.theme).toBe("forest-dark");
+    expect(document.documentElement.dataset.theme).toBe("learning-dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
     expect(new URLSearchParams(window.location.search).get("theme")).toBe("dark");
   });
@@ -49,11 +49,11 @@ describe("ThemeControl", () => {
     const user = userEvent.setup();
     window.history.replaceState(null, "", "/?theme=dark");
     renderThemeControl();
-    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("forest-dark"));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("learning-dark"));
 
     await user.click(screen.getByRole("radio", { name: /System/ }));
 
-    expect(document.documentElement.dataset.theme).toBe("forest-light");
+    expect(document.documentElement.dataset.theme).toBe("learning-light");
     expect(new URLSearchParams(window.location.search).has("theme")).toBe(false);
   });
 

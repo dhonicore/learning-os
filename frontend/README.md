@@ -45,8 +45,8 @@ npm run build       # production build
 npm run check       # all four in order
 ```
 
-`tests/tokens.test.ts` reads `../app.py` and fails if the palette here drifts from the
-Streamlit source of truth, so the two frontends cannot diverge silently.
+`tests/tokens.test.ts` reads `app/globals.css` and fails if `lib/tokens.ts` drifts
+from the CSS source of truth, so components that need raw colours stay in sync.
 
 ## Structure
 
@@ -66,6 +66,8 @@ tests/                   vitest suites
 
 - Components use semantic tokens (`bg-surface`, `text-muted`, `border-line`), never raw
   palette values, so no component needs `dark:` variants.
-- No new colours: every value comes from the validated Streamlit palette.
+- No raw palette values in components: use semantic tokens (`bg-surface`, `text-muted`,
+  `border-line`). The palette is defined in `app/globals.css` and mirrored in
+  `lib/tokens.ts`.
 - 1px borders only where they aid orientation; no decorative gradients or drop shadows.
 - Anything belonging to a later phase is labelled as pending rather than faked.

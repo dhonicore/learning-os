@@ -48,21 +48,21 @@ describe("SqlEditor theme mapping (Slice C)", () => {
     document.documentElement.removeAttribute("data-theme");
   });
 
-  it("uses the light Monaco theme when the app resolves light", () => {
-    expect(renderEditor("/", false)).toBe("light");
+  it("uses the custom light Monaco theme when the app resolves light", () => {
+    expect(renderEditor("/", false)).toBe("learning-light");
   });
 
-  it("uses vs-dark when explicit dark is chosen", () => {
-    expect(renderEditor("/?theme=dark", false)).toBe("vs-dark");
+  it("uses the custom dark Monaco theme when explicit dark is chosen", () => {
+    expect(renderEditor("/?theme=dark", false)).toBe("learning-dark");
   });
 
-  it("uses the light Monaco theme when explicit light overrides a dark device", () => {
-    expect(renderEditor("/?theme=light", true)).toBe("light");
+  it("uses the custom light Monaco theme when explicit light overrides a dark device", () => {
+    expect(renderEditor("/?theme=light", true)).toBe("learning-light");
   });
 
-  it("uses vs-dark in System mode on a dark device (mode vs resolved regression)", () => {
+  it("uses the custom dark Monaco theme in System mode on a dark device", () => {
     // Default mode is System; a dark device resolves dark. Keying Monaco off
     // `mode` rendered a white editor here — the Slice C bug.
-    expect(renderEditor("/", true)).toBe("vs-dark");
+    expect(renderEditor("/", true)).toBe("learning-dark");
   });
 });

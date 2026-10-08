@@ -294,10 +294,10 @@ test.describe('Settings page', () => {
 
     await page.locator('main').getByTestId('theme-dark').click();
     // Real DOM condition: <html data-theme> painted by the theme engine.
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'forest-dark', null, { timeout: 30000 });
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'learning-dark', null, { timeout: 30000 });
 
     await page.locator('main').getByTestId('theme-light').click();
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'forest-light', null, { timeout: 30000 });
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'learning-light', null, { timeout: 30000 });
   });
 
   test('shows backend diagnostics', async ({ page }) => {
@@ -363,12 +363,12 @@ test.describe('Workspace composition', () => {
 test.describe('Themes', () => {
   test('Light theme renders correctly', async ({ page }) => {
     await page.goto('/?theme=light');
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'forest-light', null, { timeout: 30000 });
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'learning-light', null, { timeout: 30000 });
   });
 
   test('Dark theme renders correctly', async ({ page }) => {
     await page.goto('/?theme=dark');
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'forest-dark', null, { timeout: 30000 });
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'learning-dark', null, { timeout: 30000 });
   });
 });
 
