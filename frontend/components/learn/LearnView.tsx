@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { Meta, ToolResult } from "@/types/api";
 
-import { PageHeader, Panel, SectionHead, Eyebrow } from "@/components/ui/primitives";
 import { SqlEditor } from "@/components/learn/SqlEditor";
 import { ActionBar } from "@/components/learn/ActionBar";
 import { QuestionHeader } from "@/components/learn/QuestionHeader";
@@ -12,13 +11,9 @@ import { TutorPanel } from "@/components/learn/TutorPanel";
 import { ErrorAlert } from "@/components/learn/ErrorAlert";
 import { useActivity, type ActivityEntry } from "@/lib/activity-context";
 
-// Type for the per-question attempts counter.
 type AttemptsMap = Record<number, number>;
-
-// Type for SQL drafts per question.
 type DraftsMap = Record<number, string>;
 
-// Type for tutor turn response.
 type TutorTurnResponse = {
   reply: string;
   history: unknown[];
@@ -26,17 +21,12 @@ type TutorTurnResponse = {
   tool_result: ToolResult;
 };
 
-// Type for error state.
 type ErrorState = {
   message: string;
   canRetry: boolean;
   retryAction?: () => void;
 } | null;
 
-// Slice B: the near-action outcome line reports the most recent *completed*
-// turn. While an error is shown the alert owns that moment, so a stale
-// outcome is suppressed until the error is dismissed or retried. No turn
-// logic changes — this only derives presentation state.
 function lastOutcomeOf(
   tutorResult: ToolResult | null,
   error: ErrorState,
@@ -45,17 +35,26 @@ function lastOutcomeOf(
   return tutorResult.correct ? "correct" : "incorrect";
 }
 
+/** Friendly error text for learner-facing UI. Never exposes raw codes or commands. */
+function friendlyError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("cannot reach") || lower.includes("fetch") || message.startsWith("HTTP 0")) {
+    return "Cannot reach the tutor service. Make sure the backend is running, then retry.";
+  }
+  if (/^HTTP \d+:/.test(message)) {
+    return "The tutor service returned an error. Please wait a moment and try again.";
+  }
+  return message;
+}
+
 // ---------------------------------------------------------------------------
-// Learn workspace — functional SQL learning surface with Monaco editor.
+// Learn workspace — focused SQL learning surface.
 // ---------------------------------------------------------------------------
 
 export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: string | null }) {
   const { addEntry, activityLog } = useActivity();
 
-  // --- API data ---
-  // Use server-fetched meta prop; no client-side refetch needed (page is force-dynamic)
   const metaData = meta;
-  // Derive selectedId from meta on first render; use state only for user-driven changes
   const initialSelectedId = metaData?.questions[0]?.id ?? null;
   const [selectedId, setSelectedId] = useState<number | null>(initialSelectedId);
   const [tutorResult, setTutorResult] = useState<ToolResult | null>(null);
@@ -68,41 +67,44 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
   const [error, setError] = useState<ErrorState>(null);
   const [duplicate, setDuplicate] = useState<boolean>(false);
 
-  // Duplicate guard: mirrors Streamlit `_run_turn` / `last_submit_sig`.
-  // Signature is (qid, sql.strip(), gaveUp); checked before the turn,
-  // recorded after success, cleared on failure so a retry is never blocked.
   const lastSubmitSigRef = useRef<{ sig: string; ts: number } | null>(null);
   const DUPLICATE_WINDOW_MS = 1500;
 
-  // Question selection
   const currentDraft = drafts[selectedId ?? 0] ?? "";
 
-  // --- Handle question select ---
+  const completedIds = useMemo(
+    () => new Set(activityLog.filter((e) => e.correct).map((e) => e.qid)),
+    [activityLog],
+  );
+
   const handleQuestionSelect = useCallback((id: number) => {
     setSelectedId(id);
-    // Preserve draft (requirement); reset tutor state for new question
     setTutorResult(null);
     setReply(null);
     setHintLevel(null);
     setGaveUp(false);
     setError(null);
     setDuplicate(false);
-    setAttempts((prev) => ({ ...prev, [id]: (prev[id] ?? 0) }));
+    setAttempts((prev) => ({ ...prev, [id]: prev[id] ?? 0 }));
   }, []);
 
-  // --- Handle draft change ---
+  const handleNextQuestion = useCallback(() => {
+    if (!metaData?.questions.length) return;
+    const currentIndex = metaData.questions.findIndex((q) => q.id === selectedId);
+    const next = metaData.questions[currentIndex + 1];
+    if (next) {
+      handleQuestionSelect(next.id);
+    }
+  }, [metaData, selectedId, handleQuestionSelect]);
+
   const handleDraftChange = useCallback((qid: number, sql: string) => {
     setDrafts((prev) => ({ ...prev, [qid]: sql }));
   }, []);
 
-  // Use a ref to store the latest executeTutorTurn for retry
   const executeTutorTurnRef = useRef<((isGiveUp: boolean) => Promise<void>) | null>(null);
 
-  // --- Shared tutor turn handler ---
   const executeTutorTurn = useCallback(async (isGiveUp: boolean) => {
     if (selectedId == null) return;
-    // Duplicate guard (same rule as Streamlit): same (qid, sql, gaveUp)
-    // within 1.5 s is ignored without an API call.
     const sig = JSON.stringify([selectedId, currentDraft.trim(), isGiveUp]);
     const now = performance.now();
     const prev = lastSubmitSigRef.current;
@@ -111,6 +113,9 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
       return;
     }
     setDuplicate(false);
+    setTutorResult(null);
+    setReply(null);
+    setHintLevel(null);
     setPending(true);
     setError(null);
     try {
@@ -142,7 +147,6 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
       setHintLevel(data.tool_result.hint_level);
       if (isGiveUp) setGaveUp(true);
 
-      // Append to activity log — EXACT match to Streamlit's activity_log keys
       const newEntry: ActivityEntry = {
         qid: selectedId,
         title: metaData?.questions.find((q) => q.id === selectedId)?.question ?? "",
@@ -150,23 +154,17 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
         attempt: data.attempt,
         hint_level: data.tool_result.hint_level,
         gave_up: data.tool_result.gave_up,
-        timestamp: new Date().toISOString().slice(0, 19), // ISO-8601 seconds
+        timestamp: new Date().toISOString().slice(0, 19),
       };
       addEntry(newEntry);
 
-      // Increment attempt counter
       setAttempts((prev) => ({ ...prev, [selectedId]: data.attempt }));
-      // Record signature only after success (mirrors Streamlit: a failed turn
-      // clears the signature so an immediate retry is never blocked).
       lastSubmitSigRef.current = { sig, ts: performance.now() };
     } catch (err) {
       lastSubmitSigRef.current = null;
-      const message = err instanceof Error ? err.message : "Unknown error";
-      const isNetwork = message.startsWith("HTTP 0") || message.includes("fetch");
+      const raw = err instanceof Error ? err.message : "Unknown error";
       setError({
-        message: isNetwork
-          ? "Cannot reach the tutor service. Make sure the backend is running: `uvicorn app_main:app --port 8000`"
-          : message,
+        message: friendlyError(raw),
         canRetry: true,
         retryAction: () => executeTutorTurnRef.current?.(isGiveUp),
       });
@@ -175,34 +173,20 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
     }
   }, [selectedId, currentDraft, attempts, metaData, addEntry]);
 
-  // Keep ref updated
   useEffect(() => {
     executeTutorTurnRef.current = executeTutorTurn;
   }, [executeTutorTurn]);
 
-  // --- Handle Submit SQL ---
   const handleSubmit = useCallback(() => executeTutorTurn(false), [executeTutorTurn]);
-
-  // --- Handle Give Up ---
   const handleGiveUp = useCallback(() => executeTutorTurn(true), [executeTutorTurn]);
 
-  // --- Render ---
   if (loadError) {
     return (
       <div className="p-8">
-        <PageHeader
-          eyebrow="Learn"
-          title="The workspace could not load"
-          description="Question metadata comes from the FastAPI backend. Nothing else on this page depends on it."
-        />
-        <Panel className="flex flex-col gap-3 p-6">
-          <p className="text-sm text-error">{loadError}</p>
-          <p className="text-sm text-muted">
-            Start the backend with{" "}
-            <code className="font-mono text-xs">uvicorn app_main:app --port 8000</code> from the
-            repository root, then reload.
-          </p>
-        </Panel>
+        <h1 className="text-[1.75rem] font-semibold leading-tight sm:text-[2.25rem]">
+          The workspace could not load
+        </h1>
+        <p className="mt-4 max-w-2xl text-sm text-error">{friendlyError(loadError)}</p>
       </div>
     );
   }
@@ -210,59 +194,33 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
   if (!metaData) {
     return (
       <div className="p-8">
-        <PageHeader eyebrow="Learn" title="Loading workspace…" />
-        <Panel className="flex flex-col gap-3 p-6">
-          <p className="text-sm text-muted">Fetching question metadata from the backend.</p>
-        </Panel>
+        <h1 className="text-[1.75rem] font-semibold leading-tight sm:text-[2.25rem]">
+          Loading workspace…
+        </h1>
+        <p className="mt-4 text-sm text-muted">Fetching question metadata.</p>
       </div>
     );
   }
 
-  // Earlier attempts must contain *prior* turns only (TutorPanel's prop
-  // contract, TutorPanel.tsx:26). Every successful turn appends its activity
-  // entry in the same update that sets `tutorResult`, so the last entry for
-  // this question IS the turn on display — including it made TutorPanel's
-  // `earlierAttempts.length + (toolResult ? 1 : 0)` count that turn twice and
-  // render "Attempt 2" after the first submission (audit §1.3).
   const qidEntries = activityLog.filter((e) => e.qid === selectedId);
   const earlierAttemptEntries = tutorResult !== null ? qidEntries.slice(0, -1) : qidEntries;
 
   return (
-    <div data-testid="learn-workspace">
-      {/* Slice A: no page-title chrome — the question (QuestionHeader's h1)
-          is the primary object. This block is navigation context only. */}
-      <div className="flex flex-col gap-5 pb-8">
-        <div className="flex flex-col gap-2">
-          <Eyebrow>Learn</Eyebrow>
-          <p className="max-w-2xl text-sm leading-relaxed text-muted">
-            One checker run and one tutor reply per submission. Your SQL is never modified by the tutor.
-          </p>
-        </div>
+    <div data-testid="learn-workspace" className="flex flex-col gap-8 lg:gap-10">
+      <QuestionHeader
+        meta={meta}
+        selectedId={selectedId}
+        completedIds={completedIds}
+        onSelect={handleQuestionSelect}
+      />
 
-        <QuestionHeader
-          meta={meta}
-          selectedId={selectedId}
-          onSelect={handleQuestionSelect}
-        />
-      </div>
-
-      {/* Slice H1: one learning workspace. Two grid items (4 + 8) always
-          fill the 12-col row at lg, so the old 5/7/5 wrap that orphaned the
-          tutor beside an empty 7-col hole cannot occur. DOM order — schema,
-          then editor → action → feedback — is also the small-screen order. */}
-      <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-12">
-        {/* Reference column: SchemaPanel brings its own bordered surface,
-            so no wrapper card (the old Panel here duplicated its border and
-            its "Database schema" label). */}
+      {/* Workspace: reference + query as one coherent surface */}
+      <section aria-label="Workspace" className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
         <div className="lg:col-span-4">
-          <SchemaPanel />
+          <SchemaPanel open={true} />
         </div>
 
-        {/* SQL workspace: editor → action → verdict → tutor in one column
-            so feedback reads as the result of the Submit above it. */}
-        <Panel className="flex flex-col gap-4 p-5 sm:p-6 lg:col-span-8">
-          <p className="eyebrow">SQL workspace</p>
-
+        <div className="flex flex-col gap-4 lg:col-span-8">
           <SqlEditor
             value={currentDraft}
             onChange={(sql) => handleDraftChange(selectedId ?? 0, sql)}
@@ -289,9 +247,6 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
             lastOutcome={lastOutcomeOf(tutorResult, error)}
           />
 
-          {/* Hairline: everything below responds to the action above. */}
-          <div className="h-px bg-line" aria-hidden="true" />
-
           <TutorPanel
             toolResult={tutorResult}
             reply={reply}
@@ -302,18 +257,14 @@ export function LearnView({ meta, loadError }: { meta: Meta | null; loadError: s
               hintLevel: e.hint_level ?? undefined,
               gaveUp: e.gave_up,
             }))}
+            onNextQuestion={handleNextQuestion}
+            hasNextQuestion={
+              metaData.questions.findIndex((q) => q.id === selectedId) <
+              metaData.questions.length - 1
+            }
           />
-        </Panel>
-      </div>
-
-      <div className="mt-10">
-        <SectionHead>How correctness is decided</SectionHead>
-        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-muted">
-          Every submission is executed by Python against the practice database and compared
-          with a reference result. The language model never decides whether your SQL is
-          correct, and it only sees the checker details that the current hint level allows.
-        </p>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

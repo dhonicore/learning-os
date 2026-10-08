@@ -103,12 +103,12 @@ describe("Submission states (Slice B): idle → Checking… → outcome", () => 
     // Idle: no status line; Submit disabled only because the SQL is empty.
     expect(screen.getByTestId("submit-status")).toHaveAttribute("role", "status");
     expect(screen.getByTestId("submit-status")).toBeEmptyDOMElement();
-    expect(screen.getByRole("button", { name: "Submit SQL" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Check answer" })).toBeDisabled();
     expect(screen.getByTestId("give-up")).toBeEnabled();
 
     await typeSql(user, "SELECT 1;");
-    expect(screen.getByRole("button", { name: "Submit SQL" })).toBeEnabled();
-    await user.click(screen.getByRole("button", { name: "Submit SQL" }));
+    expect(screen.getByRole("button", { name: "Check answer" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Check answer" }));
 
     // Checking: label swap, live region, both buttons disabled, SQL untouched.
     expect(screen.getByRole("button", { name: "Checking…" })).toBeDisabled();
@@ -137,7 +137,7 @@ describe("Submission states (Slice B): idle → Checking… → outcome", () => 
     // anchored regex keeps it from matching a "Correct" assertion elsewhere.
     expect(await screen.findByTestId("tutor-status")).toHaveTextContent(/^Not quite/);
     expect(screen.getByTestId("submit-status")).toHaveTextContent(/^Not quite yet/);
-    expect(screen.getByRole("button", { name: "Submit SQL" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Check answer" })).toBeEnabled();
   });
 
   it("reports Correct. in the status line after a correct turn", async () => {
@@ -146,7 +146,7 @@ describe("Submission states (Slice B): idle → Checking… → outcome", () => 
 
     renderLearn();
     await typeSql(user, "SELECT 1;");
-    await user.click(screen.getByRole("button", { name: "Submit SQL" }));
+    await user.click(screen.getByRole("button", { name: "Check answer" }));
 
     expect(await screen.findByTestId("tutor-status")).toHaveTextContent(/^Correct/);
     expect(screen.getByTestId("submit-status")).toHaveTextContent(/^Correct\.$/);
@@ -159,11 +159,11 @@ describe("Submission states (Slice B): idle → Checking… → outcome", () => 
 
     renderLearn();
     await typeSql(user, "SELECT 1;");
-    await user.click(screen.getByRole("button", { name: "Submit SQL" }));
+    await user.click(screen.getByRole("button", { name: "Check answer" }));
     expect(await screen.findByTestId("tutor-status")).toHaveTextContent(/^Not quite/);
 
     // Same (qid, sql, gaveUp) within the window: ignored before any request.
-    await user.click(screen.getByRole("button", { name: "Submit SQL" }));
+    await user.click(screen.getByRole("button", { name: "Check answer" }));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("duplicate-caption")).toHaveTextContent(
@@ -186,19 +186,23 @@ describe("Submission states (Slice B): idle → Checking… → outcome", () => 
 
     renderLearn();
     await typeSql(user, "SELECT 1;");
-    await user.click(screen.getByRole("button", { name: "Submit SQL" }));
+    await user.click(screen.getByRole("button", { name: "Check answer" }));
     expect(await screen.findByTestId("tutor-status")).toHaveTextContent(/^Not quite/);
     expect(screen.getByTestId("submit-status")).toHaveTextContent(/^Not quite yet/);
 
     // Change the SQL so the 1.5 s signature differs, then fail the turn.
     await typeSql(user, " 2");
-    await user.click(screen.getByRole("button", { name: "Submit SQL" }));
+    await user.click(screen.getByRole("button", { name: "Check answer" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("HTTP 502: Bad gateway");
+    // Friendly, learner-facing copy: no raw status codes or commands.
+    expect(alert).toHaveTextContent("Something went wrong");
+    expect(alert).toHaveTextContent("The tutor service returned an error. Please wait a moment and try again.");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByTestId("tutor-panel")).not.toBeInTheDocument();
     // While the alert owns the moment the outcome line stays silent.
     expect(screen.getByTestId("submit-status")).toBeEmptyDOMElement();
-    expect(screen.getByRole("button", { name: "Submit SQL" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Check answer" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Checking…" })).not.toBeInTheDocument();
 
     // Retry re-enters the checking state and clears the alert.

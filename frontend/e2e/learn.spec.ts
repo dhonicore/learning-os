@@ -71,13 +71,13 @@ test.describe('Learn workspace — complete flow', () => {
     // Slice A: the question itself is the page's top-level heading.
     await expect(page.locator('main').getByTestId('question-text')).toBeVisible();
     await expect(page.locator('main').locator('h1')).toContainText(/\w+/);
-    await expect(page.locator('main').locator('p.eyebrow:has-text("Practice")').first()).toBeVisible();
-    await expect(page.locator('main').locator('p.eyebrow:has-text("Held out")').first()).toBeVisible();
     await expect(page.locator('main').getByTestId('qnav-Q1')).toBeVisible({ timeout: 30000 });
     await expect(page.locator('main').getByTestId('qnav-Q8')).toBeVisible();
-    // Learner-facing tutor: calm idle state, no internal-state meta or
+    // No group labels, no idle tutor block, no internal-state meta or
     // developer hint-context anywhere on the page.
-    await expect(page.locator('main').getByTestId('tutor-idle')).toBeVisible();
+    await expect(page.locator('main')).not.toContainText('Practice');
+    await expect(page.locator('main')).not.toContainText('Held out');
+    await expect(page.locator('main').getByTestId('tutor-panel')).toHaveCount(0);
     await expect(page.locator('main').getByTestId('turn-meta')).toHaveCount(0);
     await expect(page.locator('main')).not.toContainText('Hint context');
     await expect(page.locator('main')).not.toContainText('Attempt 0');
@@ -96,14 +96,18 @@ test.describe('Learn workspace — complete flow', () => {
 
   test('opens schema panel', async ({ page }) => {
     await expect(page.locator('main').getByTestId('schema-panel')).toBeVisible();
-    // Tables detail: table names are exact test IDs (avoids matching the
-    // `orders.customer_id → customers.id` foreign-key text).
-    await page.locator('main').getByTestId('schema-tables').locator('summary').click();
+    // Tables start open on desktop and collapsed on mobile.
+    const tables = page.locator('main').getByTestId('schema-tables');
+    if (!(await tables.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await tables.locator('summary').click();
+    }
     await expect(page.locator('main').getByTestId('schema-table-customers')).toBeVisible();
     await expect(page.locator('main').getByTestId('schema-table-orders')).toBeVisible();
-    // Foreign keys detail.
-    await page.locator('main').getByTestId('schema-fks').locator('summary').click();
-    await expect(page.locator('main').getByTestId('schema-fks')).toContainText('customer_id');
+    const foreignKeys = page.locator('main').getByTestId('schema-fks');
+    if (!(await foreignKeys.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await foreignKeys.locator('summary').click();
+    }
+    await expect(foreignKeys).toContainText('customer_id');
   });
 
   test('enters SQL in Monaco editor', async ({ page }) => {
@@ -139,8 +143,8 @@ test.describe('Learn workspace — complete flow', () => {
     // Note: separate toContainText calls — Playwright's array form is
     // line-wise equality, not "contains all substrings".
     await expect(page.locator('main').getByTestId('turn-meta')).toContainText('Attempt 1', { timeout: 60000 });
-    // hint_level selects learner language; the number itself never renders.
-    await expect(page.locator('main').getByTestId('guidance-phrase')).toContainText('A small nudge', { timeout: 60000 });
+    // hint_level selects learner language; the phrase is merged into the meta line.
+    await expect(page.locator('main').getByTestId('turn-meta')).toContainText('A small nudge', { timeout: 60000 });
     // The meta line is UI-controlled: implementation language never renders.
     await expect(page.locator('main').getByTestId('turn-meta')).not.toContainText('hint level');
   });
@@ -156,12 +160,12 @@ test.describe('Learn workspace — complete flow', () => {
       await typeSql(page, attempts[i], i > 0);
       await page.locator('main').getByTestId('submit-sql').click();
       await expect(page.locator('main').getByTestId('turn-meta')).toContainText(`Attempt ${i + 1}`, { timeout: 60000 });
-      await expect(page.locator('main').getByTestId('guidance-phrase')).toContainText(phrases[i], { timeout: 60000 });
+      await expect(page.locator('main').getByTestId('turn-meta')).toContainText(phrases[i], { timeout: 60000 });
       await expect(page.locator('main').getByTestId('turn-meta')).not.toContainText('hint level');
     }
   });
 
-  test('Give Up discloses reference SQL', async ({ page }) => {
+  test('Give up discloses reference SQL', async ({ page }) => {
     await page.locator('main').getByTestId('qnav-Q1').click();
     await waitForMonacoReady(page);
 
@@ -236,7 +240,7 @@ test.describe('Learn workspace — complete flow', () => {
     // Outcome lands: status line reports it and the action re-enables.
     await expect(page.locator('main').getByTestId('tutor-status')).toContainText('Not quite', { timeout: 15000 });
     await expect(page.locator('main').getByTestId('submit-status')).toContainText('Not quite yet');
-    await expect(submit).toHaveText('Submit SQL');
+    await expect(submit).toHaveText('Check answer');
     await expect(submit).toBeEnabled();
     expect(turnCalls).toBe(1);
   });
@@ -254,7 +258,7 @@ test.describe('Progress page', () => {
   });
 
   test('shows empty state before any submissions', async ({ page }) => {
-    await expect(page.locator('main').locator('text=No submissions yet. Submit SQL')).toBeVisible();
+    await expect(page.locator('main').locator('text=No submissions yet. Check answer')).toBeVisible();
     await expect(page.locator('main').locator('h2:has-text("Not yet attempted")')).toBeVisible();
   });
 
@@ -300,12 +304,9 @@ test.describe('Settings page', () => {
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'learning-light', null, { timeout: 30000 });
   });
 
-  test('shows backend diagnostics', async ({ page }) => {
-    // Visible diagnostics content (the "Backend diagnostics" h2 is sr-only
-    // by design; users see the Diagnostics section + live API status).
-    await expect(page.locator('main').locator('text=Diagnostics').first()).toBeVisible();
-    await expect(page.locator('main').getByRole('heading', { name: 'API status' })).toBeVisible();
-    await expect(page.locator('[role="status"]').first()).toBeVisible();
+  test('does not show backend diagnostics to learners', async ({ page }) => {
+    await expect(page.locator('main')).not.toContainText('Diagnostics');
+    await expect(page.locator('main').getByRole('heading', { name: 'API status' })).toHaveCount(0);
   });
 });
 
@@ -413,7 +414,8 @@ test.describe('API failure handling', () => {
 
     const alert = page.locator('main').getByRole('alert');
     await expect(alert).toBeVisible();
-    await expect(alert).toContainText('HTTP 502');
+    await expect(alert).toContainText('The tutor service returned an error');
+    await expect(alert).not.toContainText('HTTP 502');
     // The alert owns the moment: no stale outcome, action available again.
     await expect(page.locator('main').getByTestId('submit-status')).toBeEmpty();
     await expect(page.locator('main').getByTestId('submit-sql')).toBeEnabled();
@@ -498,7 +500,7 @@ test.describe('Accessibility', () => {
     await typeSql(page, 'SELECT 1;');
 
     // Monaco traps Tab for indentation (standard editor behavior). Ctrl+M
-    // toggles "Tab moves focus" so keyboard users can exit to Submit/Give Up.
+    // toggles "Tab moves focus" so keyboard users can exit to Submit/Give up.
     await page.locator('.monaco-editor').click();
     await page.keyboard.press('ControlOrMeta+M');
     // Tab until Submit is focused (real keyboard order, bounded loop).
@@ -512,7 +514,7 @@ test.describe('Accessibility', () => {
     }
     expect(submitFocused).toBe(true);
 
-    // Next Tab reaches Give Up (ActionBar order: Submit, Give Up).
+    // Next Tab reaches Give up (ActionBar order: Submit, Give up).
     await page.keyboard.press('Tab');
     await expect(page.locator('main').getByTestId('give-up')).toBeFocused();
   });

@@ -97,7 +97,7 @@ async function submit(
   suffix: string,
 ): Promise<void> {
   await user.type(screen.getByTestId("sql-input"), suffix);
-  await user.click(screen.getByRole("button", { name: "Submit SQL" }));
+  await user.click(screen.getByRole("button", { name: "Check answer" }));
 }
 
 /** Direct render — presentation-only tests that need no page flow. */
@@ -123,12 +123,12 @@ describe("Tutor experience (learner-facing)", () => {
     vi.unstubAllGlobals();
   });
 
-  // Requirement 1 — idle must not expose internal state.
-  it("idle: calm empty state, no 'Attempt 0 · no hint', no hint context", () => {
+  // Requirement 1 — idle is invisible; no internal state leaks.
+  it("idle: no tutor panel, no 'Attempt 0 · no hint', no hint context", () => {
     renderLearn();
 
-    expect(screen.getByTestId("tutor-idle")).toBeInTheDocument();
-    expect(screen.getByText(/Check your SQL to get the checker/)).toBeInTheDocument();
+    expect(screen.queryByTestId("tutor-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tutor-idle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("turn-meta")).not.toBeInTheDocument();
     expect(screen.queryByTestId("tutor-status")).not.toBeInTheDocument();
     expect(screen.queryByText(/Attempt 0/)).not.toBeInTheDocument();
@@ -151,11 +151,11 @@ describe("Tutor experience (learner-facing)", () => {
     expect(screen.getByTestId("tutor-reply")).toHaveTextContent(
       "Focus on the WHERE clause.",
     );
-    expect(screen.getByTestId("turn-meta")).toHaveTextContent(/^Attempt 1$/);
+    expect(screen.getByTestId("turn-meta")).toHaveTextContent(/^Attempt 1 · A small nudge$/);
   });
 
   // Requirement 3 — hint implementation language never renders; hint_level
-  // only selects learner-facing phrasing.
+  // only selects learner-facing phrasing, now merged into the attempt line.
   it("hint levels render as guidance phrases, never as implementation language", () => {
     const phrases = [
       "A small nudge",
@@ -169,9 +169,7 @@ describe("Tutor experience (learner-facing)", () => {
         reply: "Tutor guidance.",
         hintLevel: level,
       });
-      expect(screen.getByTestId("guidance-phrase")).toHaveTextContent(
-        phrases[level - 1],
-      );
+      expect(screen.getByTestId("turn-meta")).toHaveTextContent(phrases[level - 1]);
       const panel = screen.getByTestId("tutor-panel");
       expect(panel).not.toHaveTextContent(/hint level/i);
       expect(panel).not.toHaveTextContent("of 4");
@@ -193,10 +191,10 @@ describe("Tutor experience (learner-facing)", () => {
     expect(panel).not.toHaveTextContent(/Model/);
     expect(panel).not.toHaveTextContent("hint_level");
     expect(panel).not.toHaveTextContent("row_diff");
-    // The learner still gets the verdict, reply and guidance phrase.
+    // The learner still gets the verdict, reply and guidance phrase in the meta line.
     expect(panel).toHaveTextContent(/^Not quite/);
     expect(panel).toHaveTextContent("Compare the row counts.");
-    expect(panel).toHaveTextContent("Here's the key idea");
+    expect(screen.getByTestId("turn-meta")).toHaveTextContent("Here's the key idea");
   });
 
   // Requirement 5 — earlier attempts remain, as supporting history.
@@ -209,27 +207,27 @@ describe("Tutor experience (learner-facing)", () => {
     renderLearn();
     await submit(user, "SELECT 13;");
     await waitFor(() =>
-      expect(screen.getByTestId("turn-meta")).toHaveTextContent(/^Attempt 1$/),
+      expect(screen.getByTestId("turn-meta")).toHaveTextContent(/^Attempt 1\b/),
     );
 
     await submit(user, "SELECT 14;");
     await waitFor(() =>
-      expect(screen.getByTestId("turn-meta")).toHaveTextContent(/^Attempt 2$/),
+      expect(screen.getByTestId("turn-meta")).toHaveTextContent(/^Attempt 2\b/),
     );
 
-    expect(screen.getByText("Earlier attempts (1)")).toBeInTheDocument();
-    expect(
-      screen.getByText("Attempt 1 · Not quite · A small nudge"),
-    ).toBeInTheDocument();
+    const earlierHeading = screen.getByTestId("earlier-attempts");
+    const earlier = earlierHeading.parentElement;
+    expect(earlier).toBeInTheDocument();
+    expect(earlier).toHaveTextContent("Attempt 1 · Not quite · A small nudge");
     // The current turn is not listed as an earlier attempt, and the rows
     // carry no internal reason codes or raw JSON.
-    expect(screen.queryByText(/^Attempt 2 ·/)).not.toBeInTheDocument();
+    expect(earlier).not.toHaveTextContent(/^Attempt 2 ·/);
     expect(screen.queryByText(/row_count/)).not.toBeInTheDocument();
     expect(screen.queryByText(/\{"correct"/)).not.toBeInTheDocument();
   });
 
   // Requirement 6 — gave up: exactly one learner-facing statement.
-  it("Give Up shows a single gave-up state with the solution under it", async () => {
+  it("Give up shows a single gave-up state with the solution under it", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(
       turnResponse({
@@ -241,7 +239,7 @@ describe("Tutor experience (learner-facing)", () => {
     );
 
     renderLearn();
-    await user.click(screen.getByRole("button", { name: "Give Up" }));
+    await user.click(screen.getByRole("button", { name: "Give up" }));
 
     expect(await screen.findByTestId("tutor-gave-up")).toHaveTextContent(
       "Reference solution revealed",
@@ -253,11 +251,11 @@ describe("Tutor experience (learner-facing)", () => {
       screen.queryByText(/reference SQL is now disclosed/i),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/Selecting Give Up disclosed/i),
+      screen.queryByText(/Selecting Give up disclosed/i),
     ).not.toBeInTheDocument();
     expect(screen.getByTestId("turn-meta")).not.toHaveTextContent(/gave up/i);
     // Exactly one gave-up statement inside the tutor panel (the ActionBar
-    // Give Up button lives outside it).
+    // Give up button lives outside it).
     const panel = screen.getByTestId("tutor-panel");
     expect(
       panel.textContent?.match(/give up/gi) ?? [],
@@ -312,8 +310,7 @@ describe("Tutor experience (learner-facing)", () => {
     expect(screen.getByTestId("tutor-reply")).toHaveTextContent(
       "Exactly right — you filtered on city.",
     );
-    expect(screen.getByTestId("turn-meta")).toHaveTextContent(/^Attempt 1$/);
-    expect(screen.queryByTestId("guidance-phrase")).not.toBeInTheDocument();
+    expect(screen.getByTestId("turn-meta")).toHaveTextContent(/^Attempt 1\b/);
     expect(screen.queryByTestId("tutor-gave-up")).not.toBeInTheDocument();
   });
 });

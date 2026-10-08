@@ -231,4 +231,26 @@
     border-top: 1px solid var(--line);
     margin: 0;
   }
+
+  /* Feedback appearance: subtle state-change motion. */
+  .animate-feedback {
+    animation: feedback-in 150ms ease-out;
+  }
+
+  @keyframes feedback-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-feedback {
+      animation: none;
+    }
+  }
 }

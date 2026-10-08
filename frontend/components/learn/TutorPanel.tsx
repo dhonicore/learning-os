@@ -3,26 +3,13 @@
 import { cn } from "@/lib/cn";
 import type { ToolResult } from "@/types/api";
 
-/** Tutor panel — the learner-facing learning guide.
+/** Tutor feedback: contextual guidance attached to the learner's attempt.
  *
- *  One turn of E5 `run_tutor_turn` produces everything shown here:
- *   - Verdict banner: "Correct" / "Not quite" + the plain-language reason
- *     label from the backend (`_REASON_LABELS` — never re-mapped locally).
- *   - Attempt line: orientation only ("Attempt 2"). The old
- *     "Attempt n · hint level k of 4 · gave up" meta line exposed
- *     implementation language and internal state.
- *   - Reference-solution state: on a Give Up turn this replaces the verdict,
- *     so the gave-up moment has exactly one learner-facing statement (the
- *     old panel rendered three).
- *   - Tutor guidance: the reply, rendered as the most legible text in the
- *     panel, through a markdown renderer that never emits raw HTML.
- *   - Guidance phrase: hint_level only *selects* presentation language
- *     ("A small nudge" → "The full solution"); its value and policy are
- *     unchanged and the number is never printed.
- *   - Earlier attempts: collapsed supporting history in plain language.
- *
- *  Developer-facing content (hint-context JSON, "model saw" payloads) is
- *  intentionally absent from the learner path.
+ *  - Appears as a meaningful state transition, not a chat card.
+ *  - Verdict is a clear semantic card with icon and title.
+ *  - Attempt count and guidance phrase are merged into one line.
+ *  - Correct state surfaces a primary Next question action.
+ *  - The reply is plain typography and code blocks.
  */
 export interface TutorPanelProps {
   /** The tool_result from the most recent E5 response. */
@@ -34,11 +21,13 @@ export interface TutorPanelProps {
   hintLevel: number | null;
   /** Array of earlier attempt summaries (from prior turns). */
   earlierAttempts: Array<{ attempt: number; correct: boolean; hintLevel?: number; gaveUp: boolean }>;
+  /** Called when the learner clicks Next question after a correct answer. */
+  onNextQuestion?: () => void;
+  /** Whether there is a next question to advance to. */
+  hasNextQuestion?: boolean;
 }
 
-/** Learner-facing phrasing for how much guidance this attempt carried.
-    Keys off hint_level only; returns null when no phrase applies (correct
-    turns, or a level the response does not provide). */
+/** Learner-facing phrasing for how much guidance this attempt carried. */
 function guidancePhrase(correct: boolean, hintLevel: number | null): string | null {
   if (correct || hintLevel === null) return null;
   if (hintLevel <= 1) return "A small nudge";
@@ -47,9 +36,7 @@ function guidancePhrase(correct: boolean, hintLevel: number | null): string | nu
   return "The full solution";
 }
 
-/** One earlier attempt as a plain-language row. The activity log stores
-    attempt number, outcome, hint level and gave-up only — there is no
-    per-attempt reason or reply to show. */
+/** One earlier attempt as a plain-language row. */
 function attemptRowLabel(a: {
   attempt: number;
   correct: boolean;
@@ -61,13 +48,25 @@ function attemptRowLabel(a: {
   return `Attempt ${a.attempt} · ${outcome}${phrase ? ` · ${phrase}` : ""}`;
 }
 
-/** Inline markdown (**bold**, *em*) → React nodes.
- *
- *  Text is only ever pushed as children, never as HTML: React escapes it,
- *  so model output such as `<img onerror=…>` renders as literal text. The
- *  previous implementation regex-replaced markdown into tags and injected
- *  the line with dangerouslySetInnerHTML (audit §9.5).
- */
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function AlertIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+/** Minimal safe markdown renderer: fenced code blocks, **bold**, *em*. */
 function inlineMarkdown(text: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
@@ -88,9 +87,6 @@ function inlineMarkdown(text: string): React.ReactNode[] {
   return nodes;
 }
 
-/** Minimal safe markdown renderer for the patterns the tutor actually
-    produces: ``` fenced code blocks, **bold**, *em*, line breaks.
-    Every string becomes a React text child — no HTML path exists. */
 function renderMarkdown(text: string): React.ReactNode {
   const parts = text.split(/```(?:sql)?\n?/);
   return parts.map((part, i) => {
@@ -102,7 +98,6 @@ function renderMarkdown(text: string): React.ReactNode {
       );
     }
     const lines = part.split("\n");
-    // A trailing newline from a code fence is not a real blank line.
     const shown = lines[lines.length - 1] === "" ? lines.slice(0, -1) : lines;
     return (
       <div key={i} className="flex flex-col gap-1">
@@ -119,79 +114,106 @@ export function TutorPanel({
   reply,
   hintLevel,
   earlierAttempts,
+  onNextQuestion,
+  hasNextQuestion = false,
 }: TutorPanelProps) {
   const hasResult = toolResult !== null;
-  const gaveUpTurn = toolResult?.gave_up === true;
-  // Attempt orientation: prior turns + the turn on display (unchanged from
-  // the attempt-number fix — the current turn is never double-counted).
-  const attemptNumber = earlierAttempts.length + (toolResult ? 1 : 0);
-  const reasonText = toolResult?.reason_label ?? "";
-  const phrase =
-    hasResult && !gaveUpTurn ? guidancePhrase(toolResult.correct, hintLevel) : null;
+  if (!hasResult) return null;
+
+  const gaveUpTurn = toolResult.gave_up === true;
+  const attemptNumber = earlierAttempts.length + 1;
+  const reasonText = toolResult.reason_label ?? "";
+  const phrase = gaveUpTurn ? null : guidancePhrase(toolResult.correct, hintLevel);
 
   return (
-    <div className="flex flex-col gap-4" data-testid="tutor-panel">
-      {/* Idle: calm empty state. No fabricated tutor content, no internal
-          state ("Attempt 0 · no hint"). */}
-      {!hasResult && (
-        <div className="flex flex-col gap-3" data-testid="tutor-idle">
-          <h2 className="eyebrow">Tutor</h2>
-          <p className="text-sm leading-relaxed text-muted">
-            Check your SQL to get the checker&rsquo;s verdict, then the
-            tutor&rsquo;s explanation. If you need another attempt, the
-            guidance grows stronger.
-          </p>
-        </div>
-      )}
-
-      {/* Give Up: the single learner-facing state for disclosure. Replaces
-          the verdict on this turn (the learner did not fail — they asked
-          for the answer); the button already carries the persistent
-          "given up" state afterwards. */}
-      {hasResult && gaveUpTurn && (
+    <div
+      className="flex flex-col gap-4 animate-feedback"
+      data-testid="tutor-panel"
+    >
+      {gaveUpTurn && (
         <div
-          className="flex flex-col gap-1 rounded-ctl border border-line bg-raised p-3"
+          className="rounded-ctl border border-muted bg-raised p-4"
           data-testid="tutor-gave-up"
         >
-          <h2 className="text-sm font-semibold text-ink">
-            Reference solution revealed
-          </h2>
-          <p className="text-xs leading-relaxed text-muted">
-            You chose Give Up, so the reference SQL and the tutor&rsquo;s
-            walkthrough appear below.
-          </p>
+          <div className="flex items-start gap-3">
+            <AlertIcon className="mt-0.5 size-5 shrink-0 text-muted" />
+            <div className="flex flex-col gap-1">
+              <h2 className="text-base font-semibold text-ink">Reference solution revealed</h2>
+              <p className="text-sm text-muted">
+                You chose Give up, so the reference SQL and walkthrough appear below.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Verdict: word + plain-language reason. Never colour alone. The
-          filled banner shares the success/error tokens with the near-action
-          status line, so the correct state reads as one result. */}
-      {hasResult && !gaveUpTurn && (
+      {!gaveUpTurn && (
         <div
           className={cn(
-            "flex flex-col gap-1 rounded-ctl p-3",
-            toolResult.correct ? "bg-success text-on-accent" : "bg-error text-on-accent",
+            "rounded-ctl border p-4",
+            toolResult.correct
+              ? "border-success bg-success-surface"
+              : "border-error bg-error-surface",
           )}
           data-testid="tutor-status"
         >
-          <h2 className="text-sm font-semibold">
-            {toolResult.correct ? "Correct" : "Not quite"}
-          </h2>
-          {reasonText && <p className="text-sm">{reasonText}</p>}
+          <div className="flex items-start gap-3">
+            {toolResult.correct ? (
+              <CheckIcon className="mt-0.5 size-5 shrink-0 text-success" />
+            ) : (
+              <AlertIcon className="mt-0.5 size-5 shrink-0 text-error" />
+            )}
+            <div className="flex flex-1 flex-col gap-2">
+              <div className="flex flex-col gap-0.5">
+                <h2
+                  className={cn(
+                    "text-base font-semibold",
+                    toolResult.correct ? "text-success" : "text-error",
+                  )}
+                >
+                  {toolResult.correct ? "Correct" : "Not quite"}
+                </h2>
+                {reasonText && <p className="text-sm text-ink">{reasonText}</p>}
+              </div>
+
+              <p className="text-xs text-muted" data-testid="turn-meta">
+                Attempt {attemptNumber}
+                {phrase ? ` · ${phrase}` : ""}
+              </p>
+
+              {toolResult.correct && hasNextQuestion && onNextQuestion && (
+                <button
+                  type="button"
+                  onClick={onNextQuestion}
+                  className="btn btn-primary mt-1 w-full rounded-ctl sm:w-auto"
+                >
+                  Next question
+                  <svg
+                    className="ml-1 size-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Attempt orientation — the number only. */}
-      {hasResult && (
+      {gaveUpTurn && (
         <p className="text-xs text-muted" data-testid="turn-meta">
           Attempt {attemptNumber}
         </p>
       )}
 
-      {/* Tutor guidance: the most legible text in the panel. */}
       {reply !== null && reply !== "" && (
         <div className="flex flex-col gap-2">
-          <h3 className="eyebrow">{gaveUpTurn ? "Reference solution" : "Tutor"}</h3>
+          <h3 className="eyebrow">{gaveUpTurn ? "Reference solution" : "Guidance"}</h3>
           <div
             className="flex flex-col gap-1 break-words text-sm leading-relaxed text-ink"
             data-testid="tutor-reply"
@@ -201,30 +223,17 @@ export function TutorPanel({
         </div>
       )}
 
-      {/* Progression, in learner language, after the guidance it describes. */}
-      {phrase !== null && (
-        <p className="flex flex-wrap items-baseline gap-2" data-testid="guidance-phrase">
-          <span className="eyebrow">Guidance</span>
-          <span className="text-xs font-medium text-ink">{phrase}</span>
-        </p>
-      )}
-
-      {/* Earlier attempts: supporting history, collapsed by default. Native
-          details/summary keeps it keyboard accessible. */}
       {earlierAttempts.length > 0 && (
-        <details>
-          <summary
-            className="cursor-pointer text-sm font-medium text-primary underline"
-            data-testid="earlier-attempts"
-          >
+        <div className="rounded-ctl border border-line bg-surface p-4">
+          <h3 className="eyebrow mb-2" data-testid="earlier-attempts">
             Earlier attempts ({earlierAttempts.length})
-          </summary>
-          <ul className="mt-2 flex flex-col gap-1.5 text-xs text-muted">
+          </h3>
+          <ul className="flex flex-col gap-1.5 text-xs text-muted">
             {earlierAttempts.map((a) => (
               <li key={a.attempt}>{attemptRowLabel(a)}</li>
             ))}
           </ul>
-        </details>
+        </div>
       )}
     </div>
   );

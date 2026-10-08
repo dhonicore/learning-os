@@ -75,7 +75,7 @@ async function submit(
   suffix: string,
 ): Promise<void> {
   await user.type(screen.getByTestId("sql-input"), suffix);
-  await user.click(screen.getByRole("button", { name: "Submit SQL" }));
+  await user.click(screen.getByRole("button", { name: "Check answer" }));
 }
 
 describe("Attempt number display (current turn not double-counted)", () => {
@@ -104,7 +104,7 @@ describe("Attempt number display (current turn not double-counted)", () => {
 
     // Requirement 1: first submission → Attempt 1 (was "Attempt 2" because
     // earlierAttempts already held the current turn and turnMeta added 1).
-    expect(turnMeta()).toHaveTextContent(/^Attempt 1$/);
+    expect(turnMeta()).toHaveTextContent(/^Attempt 1\b/);
     expect(turnMeta()).not.toHaveTextContent("Attempt 2");
     // The current attempt is also not listed as an *earlier* attempt.
     expect(screen.queryByText(/Earlier attempts/)).not.toBeInTheDocument();
@@ -116,20 +116,20 @@ describe("Attempt number display (current turn not double-counted)", () => {
 
     renderLearn();
     await submit(user, "SELECT 1;");
-    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 1$/));
+    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 1\b/));
 
     await submit(user, " 2");
 
     // Requirement 2: second submission → Attempt 2.
-    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 2$/));
+    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 2\b/));
     expect(turnMeta()).not.toHaveTextContent("Attempt 3");
 
     // Earlier attempts = prior turns only: exactly attempt 1, not attempt 2.
-    expect(screen.getByText("Earlier attempts (1)")).toBeInTheDocument();
-    expect(
-      screen.getByText("Attempt 1 · Not quite · A small nudge"),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/^Attempt 2 ·/)).not.toBeInTheDocument();
+    const earlierHeading = screen.getByTestId("earlier-attempts");
+    const earlier = earlierHeading.parentElement;
+    expect(earlier).toBeInTheDocument();
+    expect(earlier).toHaveTextContent("Attempt 1 · Not quite · A small nudge");
+    expect(earlier).not.toHaveTextContent(/^Attempt 2 ·/);
   });
 
   it("keeps counting once per submission: Attempt 3 after the third, earlier list holds 1 and 2", async () => {
@@ -141,25 +141,23 @@ describe("Attempt number display (current turn not double-counted)", () => {
 
     renderLearn();
     await submit(user, "SELECT 1;");
-    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 1$/));
+    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 1\b/));
 
     await submit(user, " 2");
-    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 2$/));
+    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 2\b/));
 
     await submit(user, " 3");
 
     // Requirement 3 (sequence): every submission increments by exactly one.
-    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 3$/));
+    await waitFor(() => expect(turnMeta()).toHaveTextContent(/^Attempt 3\b/));
     expect(turnMeta()).not.toHaveTextContent("Attempt 4");
 
-    expect(screen.getByText("Earlier attempts (2)")).toBeInTheDocument();
-    expect(
-      screen.getByText("Attempt 1 · Not quite · A small nudge"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Attempt 2 · Not quite · A small nudge"),
-    ).toBeInTheDocument();
+    const earlierHeading = screen.getByTestId("earlier-attempts");
+    const earlier = earlierHeading.parentElement;
+    expect(earlier).toBeInTheDocument();
+    expect(earlier).toHaveTextContent("Attempt 1 · Not quite · A small nudge");
+    expect(earlier).toHaveTextContent("Attempt 2 · Not quite · A small nudge");
     // The current (third) attempt never appears in the earlier-attempts list.
-    expect(screen.queryByText(/^Attempt 3 ·/)).not.toBeInTheDocument();
+    expect(earlier).not.toHaveTextContent(/^Attempt 3 ·/);
   });
 });

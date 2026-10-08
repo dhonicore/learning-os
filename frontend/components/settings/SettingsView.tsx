@@ -4,7 +4,6 @@ import { useTheme } from "@/lib/theme";
 import { THEME_MODE_DESCRIPTIONS, THEME_MODE_LABELS, THEME_MODES } from "@/lib/tokens";
 import { cn } from "@/lib/cn";
 
-import { HealthPanel } from "@/components/system/HealthPanel";
 import { PageHeader, Panel, SectionHead } from "@/components/ui/primitives";
 
 type Counts = {
@@ -14,9 +13,8 @@ type Counts = {
 };
 
 /**
- * Settings: appearance (real, wired to the theme engine), backend diagnostics
- * (real E1 probe) and the about panel. Counts come from E2 when the backend is
- * reachable and are stated honestly as unavailable when it is not.
+ * Settings: appearance only. Backend/infrastructure diagnostics are not
+ * exposed in the learner-facing product.
  */
 export function SettingsView({ counts }: { counts: Counts }) {
   const { mode, resolved, setMode, ready } = useTheme();
@@ -28,7 +26,7 @@ export function SettingsView({ counts }: { counts: Counts }) {
       <PageHeader
         eyebrow="Settings"
         title="Appearance and workspace"
-        description="The theme choice is kept in the page address, so ?theme=dark restores it on a later visit."
+        description="Choose the theme that works best for your environment."
       />
 
       <div className="flex flex-col gap-10">
@@ -88,16 +86,6 @@ export function SettingsView({ counts }: { counts: Counts }) {
           </Panel>
         </section>
 
-        <section className="flex flex-col gap-5" aria-labelledby="diagnostics-heading">
-          <SectionHead>Diagnostics</SectionHead>
-          <Panel className="p-5 sm:p-6">
-            <HealthPanel />
-            <h2 id="diagnostics-heading" className="sr-only">
-              Backend diagnostics
-            </h2>
-          </Panel>
-        </section>
-
         <section className="flex flex-col gap-5" aria-labelledby="about-heading">
           <SectionHead>About this workspace</SectionHead>
           <Panel className="flex flex-col gap-3 p-5 sm:p-6">
@@ -107,15 +95,11 @@ export function SettingsView({ counts }: { counts: Counts }) {
             <p className="max-w-3xl text-sm leading-relaxed text-muted">
               {counts.questionCount ?? unknown} SQL questions —{" "}
               {counts.practiceCount ?? unknown} practice and {counts.heldOutCount ?? unknown}{" "}
-              held out for the removal test. Every submission is executed and compared against
-              reference results by Python on Supabase PostgreSQL; the language model only
-              writes the explanations. Correctness, hint levels and answer disclosure are
-              never decided by the model.
+              held out. Every submission is executed and compared against reference results by
+              Python; the language model only writes explanations.
             </p>
             <p className="text-sm leading-relaxed text-muted">
-              Progress is session-only by design, and this frontend is being built alongside
-              the working Streamlit application, which remains the fallback until this one
-              passes acceptance testing.
+              Progress is session-only by design.
             </p>
           </Panel>
         </section>

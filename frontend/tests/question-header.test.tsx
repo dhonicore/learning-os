@@ -17,7 +17,7 @@ const META: Meta = {
 
 describe("QuestionHeader (question text)", () => {
   it("renders the selected question's actual text, not just its number", () => {
-    render(<QuestionHeader meta={META} selectedId={1} onSelect={() => {}} />);
+    render(<QuestionHeader meta={META} selectedId={1} completedIds={new Set()} onSelect={() => {}} />);
 
     expect(screen.getByTestId("question-text")).toHaveTextContent(
       "List all customers from Bengaluru.",
@@ -27,34 +27,60 @@ describe("QuestionHeader (question text)", () => {
   it("updates the rendered text when the learner selects another question", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    const { rerender } = render(<QuestionHeader meta={META} selectedId={1} onSelect={onSelect} />);
+    const { rerender } = render(<QuestionHeader meta={META} selectedId={1} completedIds={new Set()} onSelect={onSelect} />);
 
     await user.click(screen.getByTestId("qnav-Q2"));
     expect(onSelect).toHaveBeenCalledWith(2);
 
-    rerender(<QuestionHeader meta={META} selectedId={2} onSelect={onSelect} />);
+    rerender(<QuestionHeader meta={META} selectedId={2} completedIds={new Set()} onSelect={onSelect} />);
     expect(screen.getByTestId("question-text")).toHaveTextContent(
       "How many orders are there in total?",
     );
   });
 
   it("renders the question as the top-level heading (Slice A: question-first)", () => {
-    render(<QuestionHeader meta={META} selectedId={1} onSelect={() => {}} />);
+    render(<QuestionHeader meta={META} selectedId={1} completedIds={new Set()} onSelect={() => {}} />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "List all customers from Bengaluru." }),
     ).toBeInTheDocument();
   });
 
-  it("keeps navigation context to a single identity line with no duplicated Learn label", () => {
-    render(<QuestionHeader meta={META} selectedId={1} onSelect={() => {}} />);
+  it("keeps navigation context to a single identity line", () => {
+    render(<QuestionHeader meta={META} selectedId={1} completedIds={new Set()} onSelect={() => {}} />);
 
     // The identity line is split across text nodes, so match on textContent.
     expect(
       screen.getByText(
-        (_, element) => element?.textContent === "Question 1 of 2 · Practice",
+        (_, element) => element?.textContent === "Question 1 of 2",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Learn")).not.toBeInTheDocument();
+  });
+
+  it("renders question navigation as one sequence without group labels", () => {
+    render(<QuestionHeader meta={META} selectedId={1} completedIds={new Set()} onSelect={() => {}} />);
+
+    expect(screen.getByTestId("qnav-Q1")).toBeInTheDocument();
+    expect(screen.getByTestId("qnav-Q2")).toBeInTheDocument();
+    expect(screen.queryByText("Practice")).not.toBeInTheDocument();
+    expect(screen.queryByText("Held out")).not.toBeInTheDocument();
+  });
+
+  it("marks completed questions in the progress rail", () => {
+    render(<QuestionHeader meta={META} selectedId={2} completedIds={new Set([1])} onSelect={() => {}} />);
+
+    const completed = screen.getByTestId("qnav-Q1");
+    const current = screen.getByTestId("qnav-Q2");
+    expect(completed).toHaveAttribute("aria-label", expect.stringContaining("completed"));
+    expect(current).toHaveAttribute("aria-current", "step");
+  });
+
+  it("keeps the selected solved question current while showing its completed state", () => {
+    render(<QuestionHeader meta={META} selectedId={1} completedIds={new Set([1])} onSelect={() => {}} />);
+
+    const currentCompleted = screen.getByTestId("qnav-Q1");
+    expect(currentCompleted).toHaveAttribute("aria-current", "step");
+    expect(currentCompleted).toHaveAttribute("aria-label", "Question 1 completed current");
+    expect(currentCompleted.querySelector("svg")).not.toBeNull();
   });
 });
