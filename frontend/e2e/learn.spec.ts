@@ -329,22 +329,28 @@ test.describe('Workspace composition', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
     await expect(page.locator('main').getByTestId('qnav-Q1')).toBeVisible({ timeout: 30000 });
-    await expect(page.locator('main').getByTestId('tutor-idle')).toBeVisible();
+    // Idle renders no tutor block by design; the workspace is schema + editor + action.
+    await expect(page.locator('main').getByTestId('tutor-panel')).toHaveCount(0);
 
     const main = page.locator('main');
     const schema = await main.getByTestId('schema-panel').boundingBox();
     const editor = await main.getByTestId('sql-editor').boundingBox();
     const submit = await main.getByTestId('submit-sql').boundingBox();
-    const tutor = await main.getByTestId('tutor-panel').boundingBox();
     expect(schema).toBeTruthy();
     expect(editor).toBeTruthy();
     expect(submit).toBeTruthy();
-    expect(tutor).toBeTruthy();
 
     // Schema is the supporting left column; the SQL column starts to its right.
     expect(schema!.x + schema!.width).toBeLessThanOrEqual(editor!.x);
-    // The tutor is inside the SQL column (right of the schema split) and
+
+    // Feedback appears only after a submission, inside the SQL column and
     // directly below the action row — not wrapped under the schema.
+    await page.locator('main').getByTestId('qnav-Q1').click();
+    await typeSql(page, 'SELECT 13;');
+    await page.locator('main').getByTestId('submit-sql').click();
+    await expect(page.locator('main').getByTestId('tutor-status')).toContainText('Not quite', { timeout: 60000 });
+    const tutor = await main.getByTestId('tutor-panel').boundingBox();
+    expect(tutor).toBeTruthy();
     expect(tutor!.x).toBeGreaterThanOrEqual(editor!.x);
     expect(tutor!.y).toBeGreaterThanOrEqual(submit!.y + submit!.height);
     // Same left edge as the action row: both live in one panel.

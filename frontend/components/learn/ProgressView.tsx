@@ -146,7 +146,7 @@ export function ProgressView({ meta }: ProgressPageProps) {
       {log.length === 0 ? (
         <Panel className="p-5 sm:p-6 text-center">
           <p className="text-muted">
-            No submissions yet. Check an answer in the Learn workspace to see attempted and solved questions here.
+            No submissions yet. Check answer in the Learn workspace to see attempted and solved questions here.
             Progress is session-only.
           </p>
         </Panel>
